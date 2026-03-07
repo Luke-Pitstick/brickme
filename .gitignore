@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Node.js
+node_modules/
+
+# React
+react/
+react-app/
+react-app-env.d.ts
+react-app-env.js
+
