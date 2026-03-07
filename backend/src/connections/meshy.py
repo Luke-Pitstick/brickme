@@ -2,6 +2,7 @@ import requests
 from dotenv import load_dotenv
 import os
 import base64
+from pprint import pprint
 
 class MeshyClient:
     def __init__(self):
@@ -11,7 +12,6 @@ class MeshyClient:
         self.headers = {
             "Authorization": f"Bearer {self.api_key}"
         }
-        print(self.headers)
 
     def convert_image_to_mesh(self, image_path: str) -> str:
         with open(image_path, "rb") as image_file:
@@ -55,7 +55,7 @@ class MeshyClient:
         response.raise_for_status()
         return response.json()
     
-    def retrieve_model_json(self, task_id: str) -> str:
+    def retrieve_model_json(self, task_id: str) -> dict:
         response = requests.get(
             f"{self.base_url}/image-to-3d/{task_id}",
             headers=self.headers,
@@ -63,9 +63,9 @@ class MeshyClient:
         response.raise_for_status()
         return response.json()
     
-    def retrieve_texture_json(self, task_id: str) -> str:
+    def retrieve_texture_json(self, task_id: str) -> dict:
         response = requests.get(
-            f"{self.base_url}/image-to-3d/{task_id}",
+            f"{self.base_url}/retexture/{task_id}",
             headers=self.headers,
         )
         response.raise_for_status()
@@ -85,6 +85,14 @@ class MeshyClient:
     
 if __name__ == "__main__":
     meshy_client = MeshyClient()
-    id = meshy_client.convert_image_to_mesh("../../public/ps5.png")
+    # task_id = meshy_client.convert_image_to_mesh("../../public/ps5.png")["result"]
+    task_id = "019cca31-4921-7bc3-a19b-3f3400f99063"
+    print(task_id)
+    model_json = meshy_client.retrieve_model_json(task_id)
+    pprint(model_json)
+    model_url = model_json['model_urls']['glb']
+    print(model_url)
+    # meshy_client.download_untextured_model(model_url, task_id)
+    
     
     
