@@ -74,7 +74,7 @@ class MeshyClient:
     def download_untextured_model(self, model_url: str, id: str):
         response = requests.get(model_url)
         response.raise_for_status()
-        with open(f"untextured_model_{id}.glb", "wb") as model_file:
+        with open(f"../../output/untextured_model_{id}.glb", "wb") as model_file:
             model_file.write(response.content)
     
     def download_textured_model(self, textured_model_url: str, id: str) :
@@ -92,7 +92,6 @@ if __name__ == "__main__":
     pprint(model_json)
     model_url = model_json['model_urls']['glb']
     print(model_url)
-    # meshy_client.download_untextured_model(model_url, task_id)
-    
+    meshy_client.download_untextured_model(model_url, task_id)
     
     
