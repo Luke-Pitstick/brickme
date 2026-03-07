@@ -38,9 +38,53 @@ class MeshyClient:
         response.raise_for_status()
         return response.json()
         
-        
-        
+    def retexture_mesh(self, model_url: str, text_style_prompt: str, image_style_url: str) -> str:
+        payload = {
+            "model_url": model_url,
+            "text_style_prompt": text_style_prompt,
+            "image_style_url": image_style_url,
+            "enable_original_uv": True,
+            "enable_pbr": True
+        }
+
+        response = requests.post(
+            f"{self.base_url}/retexture",
+            headers=self.headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def retrieve_model_json(self, task_id: str) -> str:
+        response = requests.get(
+            f"{self.base_url}/image-to-3d/{task_id}",
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def retrieve_texture_json(self, task_id: str) -> str:
+        response = requests.get(
+            f"{self.base_url}/image-to-3d/{task_id}",
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def download_untextured_model(self, model_url: str, id: str):
+        response = requests.get(model_url)
+        response.raise_for_status()
+        with open(f"untextured_model_{id}.glb", "wb") as model_file:
+            model_file.write(response.content)
+    
+    def download_textured_model(self, textured_model_url: str, id: str) :
+        response = requests.get(textured_model_url)
+        response.raise_for_status()
+        with open(f"textured_model_{id}.glb", "wb") as textured_model_file:
+            textured_model_file.write(response.content)
+    
 if __name__ == "__main__":
     meshy_client = MeshyClient()
-    response = meshy_client.convert_image_to_mesh("../../public/ps5.png")
-    print(response)
+    id = meshy_client.convert_image_to_mesh("../../public/ps5.png")
+    
+    
