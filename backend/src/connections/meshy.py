@@ -11,7 +11,6 @@ class MeshyClient:
         self.headers = {
             "Authorization": f"Bearer {self.api_key}"
         }
-        print(self.headers)
 
     def convert_image_to_mesh(self, image_path: str) -> str:
         with open(image_path, "rb") as image_file:
@@ -85,6 +84,11 @@ class MeshyClient:
     
 if __name__ == "__main__":
     meshy_client = MeshyClient()
-    id = meshy_client.convert_image_to_mesh("../../public/ps5.png")
+    task_id = meshy_client.convert_image_to_mesh("../../public/ps5.png")["result"]
+    print(task_id)
+    model_json = meshy_client.retrieve_model_json(task_id)
+    model_url = model_json["model_url"]["glb"]
+    # meshy_client.download_untextured_model(model_url, id)
+    
     
     
