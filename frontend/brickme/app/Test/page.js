@@ -1,102 +1,124 @@
-
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
-// Helper function to load model from URL
-function autoLoadModel(url, loader, scene, THREE) {
+function centerAndScaleModel(model, THREE) {
+  model.position.set(0, 0, 0);
+  model.rotation.set(0, 0, 0);
+  model.scale.set(1, 1, 1);
+  model.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = 5 / maxDim;
+
+  model.traverse((child) => {
+    if (child.isMesh && child.geometry) {
+      child.geometry.translate(-center.x, -center.y, -center.z);
+      child.geometry.computeBoundingBox();
+      child.geometry.computeBoundingSphere();
+    }
+  });
+
+  model.scale.setScalar(scale);
+  model.rotation.x = -Math.PI / 2;
+  model.updateMatrixWorld(true);
+
+  // Sit flush on grid
+  const finalBox = new THREE.Box3().setFromObject(model);
+  model.position.y -= finalBox.min.y;
+}
+
+function loadModelFromUrl(url, loader, scene, THREE, onDone, onError) {
   loader.load(
     url,
     (gltf) => {
-      console.log("Auto-loaded model successfully!", gltf);
       const model = gltf.scene;
-
-      // Center and scale model
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 5 / maxDim;
-
-      model.position.sub(center);
-      model.scale.multiplyScalar(scale);
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      centerAndScaleModel(model, THREE);
       scene.add(model);
-
-      console.log("Model added to scene. Position:", model.position, "Scale:", model.scale);
+      onDone?.(model);
     },
     undefined,
     (err) => {
-      console.error("Failed to auto-load model:", err);
+      console.error("Failed to load model:", err);
+      onError?.(err);
     }
   );
 }
 
-export default function ModelViewer() {
+function ModelViewerInner() {
+  const searchParams = useSearchParams();
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
-  const rendererRef = useRef(null);
-  const cameraRef = useRef(null);
   const modelRef = useRef(null);
+  const loaderRef = useRef(null);
+  const THREERef = useRef(null);
+  const readyRef = useRef(false);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [threeMounted, setThreeMounted] = useState(false);
 
-  // Initialize Three.js scene
+  const loadUrl = useRef((modelUrl) => {
+    if (modelRef.current) {
+      sceneRef.current.remove(modelRef.current);
+      modelRef.current = null;
+    }
+    setLoading(true);
+    setError("");
+    setFileName("Generated Model");
+    loadModelFromUrl(
+      modelUrl,
+      loaderRef.current,
+      sceneRef.current,
+      THREERef.current,
+      (model) => { modelRef.current = model; setLoading(false); },
+      (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); }
+    );
+  });
+
+  // Initialize Three.js once — then immediately load model from window.location
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log("Initializing Three.js scene...");
-
-    // Check for auto-load model from home page
-    if (typeof window !== "undefined") {
-      const storedUrl = localStorage.getItem("modelUrl");
-      if (storedUrl) {
-        console.log("Found stored model URL, will auto-load:", storedUrl);
-        localStorage.removeItem("modelUrl");
-      }
-    }
-
-    // Dynamically import Three.js to avoid SSR issues
     Promise.all([
       import("three"),
       import("three/examples/jsm/loaders/GLTFLoader.js"),
       import("three/examples/jsm/controls/OrbitControls.js"),
     ]).then(([THREE, { GLTFLoader }, { OrbitControls }]) => {
       try {
-        // Scene setup
+        THREERef.current = THREE;
+
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x2a2a2a);
         sceneRef.current = scene;
 
-        // Camera setup
         const width = containerRef.current.clientWidth;
         const height = containerRef.current.clientHeight;
         const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 2000);
-        camera.position.set(0, 0, 10);
-        cameraRef.current = camera;
+        camera.position.set(0, 10, 0);
+        camera.lookAt(0, 0, 0);
 
-        // Renderer setup
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(width, height);
         renderer.setPixelRatio(window.devicePixelRatio);
         containerRef.current.appendChild(renderer.domElement);
-        rendererRef.current = renderer;
 
-        console.log("Renderer initialized:", { width, height });
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+        scene.add(new THREE.HemisphereLight(0x87ceeb, 0x444444, 0.6));
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(10, 20, 10);
-        scene.add(directionalLight);
-
-        const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x444444, 0.6);
-        scene.add(hemisphereLight);
-
-        // Orbit Controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
@@ -106,20 +128,13 @@ export default function ModelViewer() {
         controls.enablePan = true;
         controls.maxDistance = 100;
         controls.minDistance = 1;
+        controls.target.set(0, 0, 0);
+        controls.update();
 
-        // Grid helper
-        const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
-        scene.add(gridHelper);
+        scene.add(new THREE.GridHelper(50, 50, 0x444444, 0x222222));
 
-        // Store loader for later use
-        const gltfLoader = new GLTFLoader();
-        window.__gltfLoader = gltfLoader;
-        window.__scene = scene;
-        window.__camera = camera;
-        window.__controls = controls;
-        window.__THREE = THREE;
+        loaderRef.current = new GLTFLoader();
 
-        // Animation loop
         const animate = () => {
           requestAnimationFrame(animate);
           controls.update();
@@ -127,7 +142,6 @@ export default function ModelViewer() {
         };
         animate();
 
-        // Handle resize
         const handleResize = () => {
           if (!containerRef.current) return;
           const w = containerRef.current.clientWidth;
@@ -136,31 +150,35 @@ export default function ModelViewer() {
           camera.updateProjectionMatrix();
           renderer.setSize(w, h);
         };
-
         window.addEventListener("resize", handleResize);
-        setThreeMounted(true);
-        console.log("Three.js scene initialized successfully!");
 
-        // Auto-load stored model if exists
-        const storedUrl = localStorage.getItem("modelUrl");
-        if (storedUrl) {
-          console.log("Auto-loading stored model:", storedUrl);
-          localStorage.removeItem("modelUrl");
-          autoLoadModel(storedUrl, gltfLoader, scene, THREE);
-        }
+        readyRef.current = true;
+        setThreeMounted(true);
+
+        // Read directly from window.location — bypasses React render timing issues
+        const params = new URLSearchParams(window.location.search);
+        const modelUrl = params.get("modelUrl");
+        if (modelUrl) loadUrl.current(modelUrl);
 
         return () => {
           window.removeEventListener("resize", handleResize);
           renderer.dispose();
         };
       } catch (err) {
-        console.error("Failed to initialize Three.js:", err);
         setError("Failed to initialize 3D viewer: " + err.message);
       }
     });
   }, []);
 
-  const handleFileUpload = async (e) => {
+  // Handle URL changes after init (e.g. user navigates to a different model)
+  useEffect(() => {
+    if (!readyRef.current) return; // first load is handled inside init
+    const modelUrl = searchParams.get("modelUrl");
+    if (!modelUrl) return;
+    loadUrl.current(modelUrl);
+  }, [searchParams]);
+
+  const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -178,77 +196,25 @@ export default function ModelViewer() {
     setError("");
     setFileName(file.name);
 
-    try {
-      const url = URL.createObjectURL(file);
-      console.log("Loading model from:", url);
+    const url = URL.createObjectURL(file);
 
-      const THREE = await import("three");
-      const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
-
-      const loader = new GLTFLoader();
-
-      loader.load(
-        url,
-        (gltf) => {
-          console.log("Model loaded successfully!", gltf);
-
-          // Remove previous model
-          if (modelRef.current) {
-            sceneRef.current.remove(modelRef.current);
-          }
-
-          const model = gltf.scene;
-          modelRef.current = model;
-
-          // Traverse and log model structure
-          model.traverse((node) => {
-            if (node.isMesh) {
-              node.castShadow = true;
-              node.receiveShadow = true;
-              console.log("Mesh found:", node.name, node.geometry.boundingBox);
-            }
-          });
-
-          // Center and scale model
-          const box = new THREE.Box3().setFromObject(model);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 5 / maxDim;
-
-          console.log("Model dimensions:", { size, center, maxDim, scale });
-
-          model.position.sub(center);
-          model.scale.multiplyScalar(scale);
-
-          sceneRef.current.add(model);
-
-          console.log("Model added to scene. Position:", model.position, "Scale:", model.scale);
-
-          setLoading(false);
-          URL.revokeObjectURL(url);
-        },
-        (progress) => {
-          const percent = ((progress.loaded / progress.total) * 100).toFixed(0);
-          console.log("Loading progress:", percent + "%");
-        },
-        (err) => {
-          console.error("Model load error:", err);
-          setError("Failed to load model: " + (err.message || "Unknown error"));
-          setLoading(false);
-          URL.revokeObjectURL(url);
-        }
-      );
-    } catch (err) {
-      console.error("File upload error:", err);
-      setError("Error: " + err.message);
-      setLoading(false);
+    if (modelRef.current) {
+      sceneRef.current.remove(modelRef.current);
+      modelRef.current = null;
     }
+
+    loadModelFromUrl(
+      url,
+      loaderRef.current,
+      sceneRef.current,
+      THREERef.current,
+      (model) => { modelRef.current = model; setLoading(false); URL.revokeObjectURL(url); },
+      (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); URL.revokeObjectURL(url); }
+    );
   };
 
   return (
     <div className="w-full h-screen flex flex-col bg-gray-900">
-      {/* Header */}
       <div className="bg-gray-800 text-white p-6 shadow-lg z-10">
         <h1 className="text-3xl font-bold mb-4">3D Model Viewer</h1>
 
@@ -271,6 +237,13 @@ export default function ModelViewer() {
             </div>
           )}
 
+          {loading && (
+            <div className="flex items-center gap-2 text-yellow-400 text-sm">
+              <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+              Loading model...
+            </div>
+          )}
+
           {!threeMounted && (
             <div className="text-yellow-400 text-sm">Initializing 3D viewer...</div>
           )}
@@ -279,7 +252,6 @@ export default function ModelViewer() {
         {error && <div className="mt-3 text-red-400 text-sm">{error}</div>}
       </div>
 
-      {/* 3D Viewer */}
       <div
         ref={containerRef}
         className="flex-1 bg-gray-800 relative overflow-hidden"
@@ -295,5 +267,20 @@ export default function ModelViewer() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ModelViewer() {
+  return (
+    <Suspense fallback={
+      <div className="w-full h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-white text-center">
+          <div className="w-12 h-12 border-4 border-[#9B6DC6] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p>Loading viewer...</p>
+        </div>
+      </div>
+    }>
+      <ModelViewerInner />
+    </Suspense>
   );
 }
