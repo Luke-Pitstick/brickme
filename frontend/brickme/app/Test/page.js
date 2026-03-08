@@ -1,7 +1,8 @@
+"use client";
 import dynamic from "next/dynamic";
 
 // Dynamically import to avoid SSR issues
-const BabylonScene = dynamic(() => import("../components/BabylonScene"), {
+const BabylonScene = dynamic(() => import("../../components/BabylonScene"), {
   ssr: false,
 });
 
