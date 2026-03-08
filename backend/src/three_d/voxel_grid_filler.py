@@ -4,7 +4,7 @@ from scipy.ndimage import binary_fill_holes
 from scipy.spatial import cKDTree
 
 def fill_hollow_voxel_grid_nearest_color(voxel_grid):
-    occ, min_idx = voxel_grid_to_occupancy(voxel_grid)
+    occ, min_idx = voxel_grid_to_occupancy_no_dict(voxel_grid)
     if occ.size == 0:
         return o3d.geometry.VoxelGrid()
 
@@ -43,7 +43,7 @@ def fill_hollow_voxel_grid_nearest_color(voxel_grid):
 
     return new_vg
 
-def voxel_grid_to_occupancy(voxel_grid):
+def voxel_grid_to_occupancy_no_dict(voxel_grid):
     voxels = voxel_grid.get_voxels()
     if not voxels:
         return np.zeros((0, 0, 0), dtype=bool), np.array([0, 0, 0], dtype=int)
@@ -62,7 +62,7 @@ def voxel_grid_to_occupancy(voxel_grid):
     return occ, min_idx
 
 def fill_hollow_voxel_grid(voxel_grid, fill_color=(0.5, 0.5, 0.5)):
-    occ, min_idx = voxel_grid_to_occupancy(voxel_grid)
+    occ, min_idx = voxel_grid_to_occupancy_no_dict(voxel_grid)
     if occ.size == 0:
         return o3d.geometry.VoxelGrid()
 
@@ -96,3 +96,24 @@ def fill_hollow_voxel_grid(voxel_grid, fill_color=(0.5, 0.5, 0.5)):
         new_vg.add_voxel(voxel)
 
     return new_vg
+
+def voxel_grid_to_occupancy(voxel_grid):
+    voxels = voxel_grid.get_voxels()
+    if not voxels:
+        return np.zeros((0, 0, 0), dtype=bool), np.array([0, 0, 0], dtype=int), {}
+
+    indices = np.array([v.grid_index for v in voxels], dtype=int)
+    min_idx = indices.min(axis=0)
+    max_idx = indices.max(axis=0)
+    shape = max_idx - min_idx + 1
+
+    occ = np.zeros(shape, dtype=bool)
+    color_dict = {}
+
+    for v in voxels:
+        global_idx = tuple(np.array(v.grid_index, dtype=int))
+        local_idx = tuple(np.array(v.grid_index, dtype=int) - min_idx)
+        occ[local_idx] = True
+        color_dict[global_idx] = np.array(v.color, dtype=float)
+
+    return occ, min_idx, color_dict

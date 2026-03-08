@@ -8,5 +8,7 @@ python-dotenv==1.1.0
 numpy
 networkx
 trimesh[easy]
+scipy
+open3d
 pytest>=7.0.0
 pytest
