@@ -92,7 +92,7 @@ export default function ModelViewer() {
         THREERef.current = THREE;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x2a2a2a);
+        scene.background = new THREE.Color(0xc4c4c4);
         sceneRef.current = scene;
 
         const width = containerRef.current.clientWidth;
