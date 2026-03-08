@@ -216,3 +216,5 @@ react-app-env.d.ts
 react-app-env.js
 
 .DS_Store
+.vercel
+.env*.local

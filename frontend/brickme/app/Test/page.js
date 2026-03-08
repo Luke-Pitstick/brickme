@@ -110,7 +110,7 @@ export default function ModelViewer() {
         const dirLight = new THREE.DirectionalLight(0xffffff, 1);
         dirLight.position.set(10, 20, 10);
         scene.add(dirLight);
-        scene.add(new THREE.HemisphereLight(0x87ceeb, 0x444444, 0.6));
+        scene.add(new THREE.HemisphereLight(0xfafafa, 0x444444, 1));
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;

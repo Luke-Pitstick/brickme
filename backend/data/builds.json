@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1b57f027-3925-4f88-a05d-b519f1c8402d",
+    "user_id": "local-dev-user",
+    "name": "Untitled Build",
+    "image_url": "http://localhost:8000/mock-images/0b35d734-eea0-4a6a-9bbb-4017ee0ad115.jpg",
+    "model_url": "http://localhost:8000/output/jobs/019cce09-8a88-7e2f-9f9d-28b6188aff92/lego_final.glb",
+    "created_at": "2026-03-08T15:25:54.197473Z"
+  },
+  {
+    "id": "cb84da10-1a06-420d-898f-8294974244af",
+    "user_id": "local-dev-user",
+    "name": "Untitled Build",
+    "image_url": "http://localhost:8000/mock-images/f74fe7b8-bc4f-4f0e-a9b4-0aeb4a0d96a6.png",
+    "model_url": "http://localhost:8000/output/jobs/019cce85-b234-78c1-9960-0a36aeb0efb4/lego_final.glb",
+    "created_at": "2026-03-08T17:40:05.041838Z"
+  },
+  {
+    "id": "94178150-6914-43d8-adf0-0205d7ad5d89",
+    "user_id": "local-dev-user",
+    "name": "Untitled Build",
+    "image_url": "http://localhost:8000/mock-images/81decfdf-4bbe-4759-822a-f459a835a12d.png",
+    "model_url": "http://localhost:8000/output/jobs/019ccea7-6f8d-7249-985d-c1340af33868/lego_final.glb",
+    "created_at": "2026-03-08T18:20:43.663898Z"
+  }
+]
