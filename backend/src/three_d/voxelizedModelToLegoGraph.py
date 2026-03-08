@@ -122,7 +122,7 @@ def build_filled_status_matrix(voxel_grid):
             _, nn = tree.query(np.array(global_idx))
             matrix[zxy_idx] = ("filled", rgb_to_closest_hex(colors[nn]))
 
-    return matrix
+    return matrix.transpose(2, 0, 1)
 
 
 # Precompute piece offsets once
