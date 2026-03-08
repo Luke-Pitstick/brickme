@@ -210,6 +210,7 @@ export default function ModelViewer() {
       const dataUrl = await fileToBase64(file);
       sessionStorage.setItem("uploadedModelDataUrl", dataUrl);
       sessionStorage.setItem("uploadedModelName", file.name);
+      sessionStorage.setItem("uploadedModelTimestamp", Date.now().toString());
     } catch (err) {
       console.warn("Could not store model in sessionStorage:", err);
     }

@@ -124,33 +124,45 @@ function createViewer(el, { bgColor = 0xf5f0e8, autoRotate = false, fov = 55, ca
 
 // ── Full 3-D viewer (main panel + cover) ────────────────────────────────────
 
-function ModelViewer({ dataUrl, bgColor = 0xf5f0e8 }) {
+function ModelViewer({ dataUrl }) {
   const containerRef = useRef(null);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
-    if (!containerRef.current || !dataUrl) return;
-    let viewer, blobUrl;
+    const el = containerRef.current;
+    if (!el || !dataUrl) return;
 
-    createViewer(containerRef.current, { bgColor, autoRotate: false }).then((v) => {
-      viewer = v;
+    // Single state object visible to both the async chain and the cleanup
+    const s = { destroyed: false, viewer: null, blobUrl: null };
+    setStatus("loading");
+
+    createViewer(el, { bgColor: 0xf5f0e8, autoRotate: false }).then((v) => {
+      if (s.destroyed) { v.destroy(); return; }
+      s.viewer = v;
+
+      // dataUrl is already a data-URL — convert to blob for GLTFLoader
       fetch(dataUrl)
         .then(r => r.blob())
         .then(blob => {
-          blobUrl = URL.createObjectURL(blob);
-          loadModelFromUrl(blobUrl, v.loader, v.scene, v.THREE,
-            () => { setStatus("ready"); URL.revokeObjectURL(blobUrl); blobUrl = null; },
-            () => setStatus("error")
+          if (s.destroyed) return;
+          s.blobUrl = URL.createObjectURL(blob);
+          loadModelFromUrl(s.blobUrl, v.loader, v.scene, v.THREE,
+            () => {
+              if (s.blobUrl) { URL.revokeObjectURL(s.blobUrl); s.blobUrl = null; }
+              if (!s.destroyed) setStatus("ready");
+            },
+            () => { if (!s.destroyed) setStatus("error"); }
           );
         })
-        .catch(() => setStatus("error"));
+        .catch(() => { if (!s.destroyed) setStatus("error"); });
     });
 
     return () => {
-      viewer?.destroy();
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      s.destroyed = true;
+      s.viewer?.destroy();
+      if (s.blobUrl) { URL.revokeObjectURL(s.blobUrl); s.blobUrl = null; }
     };
-  }, [dataUrl]);   // re-runs whenever dataUrl changes → new model loads fresh
+  }, [dataUrl]);
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", borderRadius: "8px", overflow: "hidden" }}>
@@ -324,19 +336,40 @@ export default function InstructionsPage() {
   const [page, setPage] = useState(0);
   const [modelDataUrl, setModelDataUrl] = useState(null);
   const [modelName, setModelName] = useState("My Model");
+  const [lastTimestamp, setLastTimestamp] = useState(null);
   const totalPages = STEP_DATA.length;
 
-  // Re-read sessionStorage every time the page component mounts.
-  // This runs on every navigation to this route, so a new upload is always picked up.
+  // Read sessionStorage on mount AND whenever the tab regains focus
+  // (covers: user goes back to viewer, uploads new model, returns here)
   useEffect(() => {
-    const dataUrl = sessionStorage.getItem("uploadedModelDataUrl");
-    const name    = sessionStorage.getItem("uploadedModelName");
-    if (dataUrl) {
-      setModelDataUrl(dataUrl);
-      setModelName((name || "model").replace(/\.[^.]+$/, ""));
-    }
-    // Reset to cover whenever we arrive (new model may have been chosen)
-    setPage(0);
+    const load = () => {
+      const dataUrl   = sessionStorage.getItem("uploadedModelDataUrl");
+      const name      = sessionStorage.getItem("uploadedModelName");
+      const timestamp = sessionStorage.getItem("uploadedModelTimestamp");
+      if (dataUrl) {
+        // Use timestamp as cheap change-detection key instead of comparing giant base64 strings
+        setLastTimestamp(prev => {
+          if (prev !== timestamp) {
+            setModelDataUrl(dataUrl);
+            setModelName((name || "model").replace(/\.[^.]+$/, ""));
+            setPage(0);
+          }
+          return timestamp;
+        });
+      }
+    };
+
+    load(); // run immediately on mount
+
+    // Also re-run when the page becomes visible again after being hidden
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", load);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", load);
+    };
   }, []);
 
   const isCover   = page === 0;
