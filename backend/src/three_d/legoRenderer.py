@@ -1,5 +1,5 @@
 import trimesh
-from legoBrick import LegoBrick
+from .legoBrick import LegoBrick
 
 STUD = 8.0
 BRICK_HEIGHT = 9.6

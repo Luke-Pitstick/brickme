@@ -1,13 +1,13 @@
-import legoBrick
+from . import legoBrick
 import networkx as nx
-from convertPointCloudtoVoxel import convert_pointcloud_to_voxel
-from glbToPointCloud import glb_to_point_cloud
+from .convertPointCloudtoVoxel import convert_pointcloud_to_voxel
+from .glbToPointCloud import glb_to_point_cloud
 import tkinter as tk
 from tkinter import filedialog
 import numpy as np
 from scipy.ndimage import binary_fill_holes
 from scipy.spatial import cKDTree
-from legoRenderer import save_model
+from .legoRenderer import save_model
 
 # ---------------------------
 # Constants / shared setup
