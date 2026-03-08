@@ -9,327 +9,267 @@ from scipy.ndimage import binary_fill_holes
 from scipy.spatial import cKDTree
 
 # ---------------------------
-# Your color palette
+# Constants / shared setup
 # ---------------------------
-lego_colors = {
+BASE_NODE = (-1, -1, -1)
+INTERNAL_CAPACITY = 1_000_000
+PIECE_SIZES = [(4, 2), (3, 2), (2, 2), (4, 1), (2, 1), (1, 1)]
+
+# ---------------------------
+# LEGO color palette
+# ---------------------------
+LEGO_COLORS = {
     "Black": "#1B2A34",
     "Blue": "#0055BF",
-    #"Bright Green": "#4B9F4A",
-    #"Bright Light Blue": "#9FC3E9",
-    #"Bright Pink": "#FF9ECD",
+    "Bright Green": "#4B9F4A",
+    "Bright Light Blue": "#9FC3E9",
+    "Bright Pink": "#FF9ECD",
     "Brown": "#6B3F22",
-    #"Dark Blue": "#0A3463",
-    #"Dark Bluish Gray": "#6D6E5C",
-    #"Dark Gray": "#6D6E6C",
-    #"Dark Orange": "#A95500",
-    #"Dark Pink": "#C870A0",
-    #"Dark Purple": "#3F2A56",
-    #"Dark Red": "#720E0F",
+    "Dark Blue": "#0A3463",
+    "Dark Bluish Gray": "#6D6E5C",
+    "Dark Gray": "#6D6E6C",
+    "Dark Orange": "#A95500",
+    "Dark Pink": "#C870A0",
+    "Dark Purple": "#3F2A56",
+    "Dark Red": "#720E0F",
     "Green": "#237841",
-    #"Light Bluish Gray": "#A0A5A9",
-    #"Light Gray": "#9BA19D",
-    #"Lime": "#BBE90B",
-    #"Magenta": "#923978",
-    #"Medium Blue": "#5A93DB",
-    #"Olive Green": "#9B9A5A",
+    "Light Bluish Gray": "#A0A5A9",
+    "Light Gray": "#9BA19D",
+    "Lime": "#BBE90B",
+    "Magenta": "#923978",
+    "Medium Blue": "#5A93DB",
+    "Olive Green": "#9B9A5A",
     "Orange": "#FE8A18",
     "Red": "#C91A09",
-    #"Reddish Brown": "#582A12",
-    #"Sand Blue": "#6074A1",
-    #"Sand Green": "#A0BCAC",
-    #"Tan": "#E4CD9E",
+    "Reddish Brown": "#582A12",
+    "Sand Blue": "#6074A1",
+    "Sand Green": "#A0BCAC",
+    "Tan": "#E4CD9E",
     "White": "#FFFFFF",
-    "Yellow": "#F2CD37"
+    "Yellow": "#F2CD37",
 }
+
 
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip("#")
     return np.array([int(hex_color[i:i+2], 16) for i in (0, 2, 4)], dtype=float)
 
-palette_names = list(lego_colors.keys())
-palette_hexes = [lego_colors[name] for name in palette_names]
-palette_rgbs = np.array([hex_to_rgb(h) for h in palette_hexes], dtype=float)
+
+PALETTE_HEXES = list(LEGO_COLORS.values())
+PALETTE_RGBS = np.array([hex_to_rgb(h) for h in PALETTE_HEXES], dtype=float)
+_rgb_hex_cache = {}
+
 
 def rgb_to_closest_hex(rgb):
     """
-    rgb is expected to be Open3D style [0,1] floats.
+    rgb is expected to be Open3D-style [0,1] floats.
     Returns closest palette hex string.
     """
-    rgb255 = np.array(rgb, dtype=float) * 255.0
-    dists = np.linalg.norm(palette_rgbs - rgb255, axis=1)
-    return palette_hexes[np.argmin(dists)]
+    key = tuple(np.round(np.asarray(rgb, dtype=float), 6))
+    if key in _rgb_hex_cache:
+        return _rgb_hex_cache[key]
 
+    rgb255 = np.asarray(rgb, dtype=float) * 255.0
+    dists = np.linalg.norm(PALETTE_RGBS - rgb255, axis=1)
+    result = PALETTE_HEXES[int(np.argmin(dists))]
+    _rgb_hex_cache[key] = result
+    return result
 
-
-def build_filled_status_matrix(voxel_grid):
-
-    voxels = voxel_grid.get_voxels()
-
-    if not voxels:
-        return np.empty((0,0,0), dtype=object)
-
-    indices = np.array([v.grid_index for v in voxels])
-
-    min_idx = indices.min(axis=0)
-    max_idx = indices.max(axis=0)
-
-    shape_xyz = max_idx - min_idx + 1
-
-    # Convert XYZ shape → ZXY
-    shape = (shape_xyz[2], shape_xyz[0], shape_xyz[1])
-
-    occ = np.zeros(shape_xyz, dtype=bool)
-
-    color_dict = {}
-
-    for v in voxels:
-        g = np.array(v.grid_index)
-        local = g - min_idx
-
-        occ[tuple(local)] = True
-        color_dict[tuple(g)] = v.color
-
-    filled_occ = binary_fill_holes(occ)
-
-    original_indices = np.array(list(color_dict.keys()))
-    original_colors = np.array(list(color_dict.values()))
-
-    tree = cKDTree(original_indices)
-
-    matrix = np.full(shape, "empty", dtype=object)
-
-    for local in np.argwhere(filled_occ):
-
-        global_idx = tuple(local + min_idx)
-
-        x, y, z = local
-
-        # convert xyz → zxy
-        matrix_index = (z, x, y)
-
-        if global_idx in color_dict:
-
-            hex_color = rgb_to_closest_hex(color_dict[global_idx])
-            matrix[matrix_index] = ("original", hex_color)
-
-        else:
-
-            _, nn = tree.query(np.array(global_idx))
-            rgb = original_colors[nn]
-
-            hex_color = rgb_to_closest_hex(rgb)
-            matrix[matrix_index] = ("filled", hex_color)
-
-    return matrix
-
-pieceSizesList = [[4,2],[3,2],[2,2],[4,1],[2,1],[1,1]]
-
-lego_colors = {
-"Black": "#1B2A34",
-"Blue": "#0055BF",
-"Bright Green": "#4B9F4A",
-"Bright Light Blue": "#9FC3E9",
-"Bright Pink": "#FF9ECD",
-"Brown": "#6B3F22",
-"Dark Blue": "#0A3463",
-"Dark Bluish Gray": "#6D6E5C",
-"Dark Gray": "#6D6E6C",
-"Dark Orange": "#A95500",
-"Dark Pink": "#C870A0",
-"Dark Purple": "#3F2A56",
-"Dark Red": "#720E0F",
-"Green": "#237841",
-"Light Bluish Gray": "#A0A5A9",
-"Light Gray": "#9BA19D",
-"Lime": "#BBE90B",
-"Magenta": "#923978",
-"Medium Blue": "#5A93DB",
-"Olive Green": "#9B9A5A",
-"Orange": "#FE8A18",
-"Red": "#C91A09",
-"Reddish Brown": "#582A12",
-"Sand Blue": "#6074A1",
-"Sand Green": "#A0BCAC",
-"Tan": "#E4CD9E",
-"White": "#FFFFFF",
-"Yellow": "#F2CD37"
-}
-
-
-
-def hex_to_rgb(hex_color):
-    """Convert hex to RGB tuple."""
-    hex_color = hex_color.lstrip('#')
-    return np.array([int(hex_color[i:i+2], 16) for i in (0, 2, 4)])
-lego_rgb = {name: hex_to_rgb(hex_code) for name, hex_code in lego_colors.items()}
 
 def get_file_path():
     root = tk.Tk()
     root.withdraw()
-    file_path = filedialog.askopenfilename(filetypes=[("GLB files", "*.glb")])
-    return file_path
+    try:
+        return filedialog.askopenfilename(filetypes=[("GLB files", "*.glb")])
+    finally:
+        root.destroy()
 
 
-def rgb_to_closest_lego_hex(rgb):
-    """
-    rgb: Open3D color (float values 0-1)
-    returns closest LEGO hex code
-    """
-    rgb = np.array(rgb) * 255
-
-    best_hex = None
-    best_dist = float('inf')
-
-    for name, color_rgb in lego_rgb.items():
-        dist = np.linalg.norm(rgb - color_rgb)
-        if dist < best_dist:
-            best_dist = dist
-            best_hex = lego_colors[name]
-
-    return best_hex
-
-def voxel_grid_to_hex_matrix(voxel_grid):
+def build_filled_status_matrix(voxel_grid):
     voxels = voxel_grid.get_voxels()
+    if not voxels:
+        return np.empty((0, 0, 0), dtype=object)
 
-    if len(voxels) == 0:
-        return np.empty((0,0,0), dtype=object)
+    indices = np.array([v.grid_index for v in voxels], dtype=int)
+    colors = np.array([v.color for v in voxels], dtype=float)
 
-    # Collect voxel indices
-    indices = np.array([v.grid_index for v in voxels])
-
-    # Determine bounding box
     min_idx = indices.min(axis=0)
     max_idx = indices.max(axis=0)
+    shape_xyz = max_idx - min_idx + 1
 
-    shape = max_idx - min_idx + 1
+    # matrix access stays matrix[z][x][y]
+    shape_zxy = (shape_xyz[2], shape_xyz[0], shape_xyz[1])
 
-    # Create 3D matrix filled with "empty"
-    matrix = np.full(shape, "empty", dtype=object)
+    local_indices = indices - min_idx
+    occ = np.zeros(shape_xyz, dtype=bool)
+    occ[local_indices[:, 0], local_indices[:, 1], local_indices[:, 2]] = True
 
-    # Fill with voxel hex colors
-    for v in voxels:
-        idx = np.array(v.grid_index) - min_idx
-        hex_color = rgb_to_closest_lego_hex(v.color)
-        matrix[tuple(idx)] = hex_color
+    filled_occ = binary_fill_holes(occ)
+    matrix = np.full(shape_zxy, "empty", dtype=object)
+
+    original_index_map = {tuple(idx): color for idx, color in zip(indices, colors)}
+    original_index_set = set(original_index_map.keys())
+    tree = cKDTree(indices)
+
+    for local in np.argwhere(filled_occ):
+        global_idx = tuple(local + min_idx)
+        zxy_idx = (local[2], local[0], local[1])
+
+        if global_idx in original_index_set:
+            matrix[zxy_idx] = ("original", rgb_to_closest_hex(original_index_map[global_idx]))
+        else:
+            _, nn = tree.query(np.array(global_idx))
+            matrix[zxy_idx] = ("filled", rgb_to_closest_hex(colors[nn]))
 
     return matrix
 
+
+# Precompute piece offsets once
+PIECE_OFFSETS = {}
+for size in PIECE_SIZES:
+    for rotated in (False, True):
+        brick = legoBrick.LegoBrick(size[0], size[1], "dummy", rotated)
+        PIECE_OFFSETS[(size, rotated)] = tuple(brick.offsetLocationsList)
+
+
 def generatePieceListFromColorMatrix(matrix):
     output_list = []
-    for i in range(matrix.shape[0]):
-        list_to_add = generateLayerPieceList(matrix[i], i)
-        for item in list_to_add:
-            output_list.append(item)
+    for z in range(matrix.shape[0]):
+        output_list.extend(generateLayerPieceList(matrix[z], z))
     return output_list
 
 
-def generateLayerPieceList(layer, layerZIndex) :
+def generateLayerPieceList(layer, layerZIndex):
     output_list = []
-    to_fill_in_matrix = np.full(layer.shape, True, dtype=bool)
+    to_fill = np.ones(layer.shape, dtype=bool)
+
     for i in range(layer.shape[0]):
         for j in range(layer.shape[1]):
-            if to_fill_in_matrix[i, j] and layer[i][j] != "empty":
-                pieceSize, isRotated = findBiggestPiece(layer, to_fill_in_matrix, i, j, layer[i][j][1], layerZIndex)
-                pieceToAdd = legoBrick.LegoBrick(pieceSize[0],pieceSize[1], layer[i][j][1], isRotated)
-                pieceToAdd.set_location(i,j,layerZIndex)
+            cell = layer[i][j]
+            if to_fill[i, j] and cell != "empty":
+                color = cell[1]
+                piece_size, is_rotated = findBiggestPiece(layer, to_fill, i, j, color, layerZIndex)
+                piece = legoBrick.LegoBrick(piece_size[0], piece_size[1], color, is_rotated)
+                piece.set_location(i, j, layerZIndex)
 
-                #SET FILLED IN PLACES IN THE GRID TO NOT DOUBLE COUNT
-                for offset in pieceToAdd.offsetLocationsList:
-                    to_fill_in_matrix[offset[0]+i][offset[1]+j] = False
-                output_list.append(pieceToAdd)
+                for dx, dy in piece.offsetLocationsList:
+                    to_fill[i + dx, j + dy] = False
+
+                output_list.append(piece)
+
     return output_list
 
-def findBiggestPiece(layer, filledInMatrix, x,y, color, zIndex):
-    for pieceType in pieceSizesList:
-        checkRotatedFirst = (zIndex % 2 == 1)
-        pieceToCheck = legoBrick.LegoBrick(pieceType[0],pieceType[1],color, checkRotatedFirst)
-        offset_list = pieceToCheck.offsetLocationsList
-        isValid = True
-        for item in offset_list:
-            if (filledInMatrix.shape[0] <= item[0] + x) or (filledInMatrix.shape[1] <= item[1] + y):
-                isValid = False
-            elif (filledInMatrix[item[0] + x][item[1] + y] == False) or layer[item[0]+x][item[1]+y] == "empty" or layer[item[0]+x][item[1]+y][1] != color:
-                isValid = False
-        if isValid:
-            return pieceType, checkRotatedFirst
 
-        pieceToCheck = legoBrick.LegoBrick(pieceType[0], pieceType[1], color, not checkRotatedFirst)
-        offset_list = pieceToCheck.offsetLocationsList
-        isValid = True
-        for item in offset_list:
-            if (filledInMatrix.shape[0] <= item[0] + x) or (filledInMatrix.shape[1] <= item[1] + y):
-                isValid = False
-            elif (filledInMatrix[item[0] + x][item[1] + y] == False) or layer[item[0]+x][item[1]+y] != color:
-                isValid = False
-        if isValid:
-            return pieceType, not checkRotatedFirst
+def _piece_fits(layer, filled_mask, x, y, color, offsets):
+    max_x, max_y = filled_mask.shape
 
-    print("Something went wrong checking piece:" + str(x) + "," + str(y)+ "  ---  no pieces were valid")
-    return [0,0], False
+    for dx, dy in offsets:
+        nx_, ny_ = x + dx, y + dy
+
+        if nx_ >= max_x or ny_ >= max_y:
+            return False
+        if not filled_mask[nx_, ny_]:
+            return False
+
+        cell = layer[nx_][ny_]
+        if cell == "empty":
+            return False
+        if cell[1] != color:
+            return False
+
+    return True
+
+
+def findBiggestPiece(layer, filledInMatrix, x, y, color, zIndex):
+    check_rotated_first = (zIndex % 2 == 1)
+
+    for piece_type in PIECE_SIZES:
+        offsets = PIECE_OFFSETS[(piece_type, check_rotated_first)]
+        if _piece_fits(layer, filledInMatrix, x, y, color, offsets):
+            return piece_type, check_rotated_first
+
+        offsets = PIECE_OFFSETS[(piece_type, not check_rotated_first)]
+        if _piece_fits(layer, filledInMatrix, x, y, color, offsets):
+            return piece_type, not check_rotated_first
+
+    print(f"Something went wrong checking piece: {x},{y} --- no pieces were valid")
+    return (1, 1), False
+
 
 def generateBrickGraphFromPieceList(pieceList):
     graph = nx.DiGraph()
+    graph.add_node(BASE_NODE)
 
-    #ADD EVERY LOCATION OF A PIECE AS A NODE, ADD EDGES BETWEEN INNER NODES OF A PIECE WITH VERY LARGE CAPACITY
+    all_positions = set()
+
+    # Add all nodes and strong internal piece edges
     for piece in pieceList:
-        x = piece.x
-        y = piece.y
-        z = piece.z
+        positions = [(piece.x + dx, piece.y + dy, piece.z) for dx, dy in piece.offsetLocationsList]
+        all_positions.update(positions)
 
-        for offset in piece.offsetLocationsList:
-            graph.add_node((x+ offset[0], y+ offset[1], z))
+        for pos in positions:
+            graph.add_node(pos)
 
-        for mainOffset in piece.offsetLocationsList:
-            for otherOffset in piece.offsetLocationsList:
-                if mainOffset != otherOffset:
-                    graph.add_edge((x+mainOffset[0],y+mainOffset[1],z), (x+otherOffset[0],y+otherOffset[1],z), capacity=1000000)
+        for a in positions:
+            for b in positions:
+                if a != b:
+                    graph.add_edge(a, b, capacity=INTERNAL_CAPACITY)
 
-    # "Baseplate Node"
-    graph.add_node((-1,-1,-1))
+    # Add vertical/baseplate connections
+    for x, y, z in all_positions:
+        above = (x, y, z + 1)
+        below = (x, y, z - 1)
 
-    for piece in pieceList:
-        x = piece.x
-        y = piece.y
-        z = piece.z
+        if above in all_positions:
+            graph.add_edge((x, y, z), above, capacity=1)
+        if below in all_positions:
+            graph.add_edge((x, y, z), below, capacity=1)
 
-        for offset in piece.offsetLocationsList:
-            if (x+offset[0], y+offset[1], z + 1) in graph:
-                graph.add_edge((x+offset[0], y+offset[1], z), (x+offset[0], y+offset[1], z + 1), capacity=1)
-
-            if (x+offset[0], y+offset[1], z - 1) in graph:
-                graph.add_edge((x+offset[0], y+offset[1], z), (x+offset[0], y+offset[1], z - 1), capacity=1)
-
-            if z == 0 :
-                graph.add_edge((x + offset[0], y + offset[1], z), (-1, -1, -1), capacity=1)
-                graph.add_edge((-1, -1, -1), (x + offset[0], y + offset[1], z), capacity=1)
+        if z == 0:
+            graph.add_edge((x, y, z), BASE_NODE, capacity=1)
+            graph.add_edge(BASE_NODE, (x, y, z), capacity=1)
 
     return graph
 
+
 def is_set_valid(setGraph, requiredAvgConnectionCount):
-    flow_value_sum = 0
+    """
+    Fast replacement for repeated maximum_flow() checks.
+
+    Old meaning:
+        For every node, verify max_flow(BASE_NODE, node) >= 1
+
+    Practical equivalent here:
+        Every node must simply be reachable from BASE_NODE.
+    """
+    if BASE_NODE not in setGraph:
+        return False, None
+
+    reachable = nx.descendants(setGraph, BASE_NODE) | {BASE_NODE}
+
     for node in setGraph.nodes:
-        if node != (-1,-1,-1):
-            flow_value, flow_dict = nx.maximum_flow(setGraph, (-1,-1,-1), node)
-            if flow_value < 1:
-                print(str(node) + "is disconnected")
-                return False, node
-            flow_value_sum += flow_value
+        if node != BASE_NODE and node not in reachable:
+            print(f"{node} is disconnected")
+            return False, node
+
     return True, None
 
 
 def generate_until_valid(colorMatrix):
     attemptCount = 0
+
     while attemptCount < 100:
         attemptCount += 1
         pieceList = generatePieceListFromColorMatrix(colorMatrix)
         graph = generateBrickGraphFromPieceList(pieceList)
         foundValid, invalidLocation = is_set_valid(graph, 0)
+
         if foundValid:
             return pieceList
-        else :
-            for i in range(invalidLocation[2]) :
-                print("Adding Pillar at :: " + str(invalidLocation[0]) + "," + str(invalidLocation[1]) + "," + str(i))
-                colorMatrix[i][invalidLocation[0]][invalidLocation[1]] = "original", "transparent"
+
+        for i in range(invalidLocation[2]):
+            print(f"Adding Pillar at :: {invalidLocation[0]},{invalidLocation[1]},{i}")
+            colorMatrix[i][invalidLocation[0]][invalidLocation[1]] = ("original", "transparent")
 
     return None
 
@@ -337,16 +277,11 @@ def generate_until_valid(colorMatrix):
 if __name__ == "__main__":
     file_path = get_file_path()
     test_cloud = glb_to_point_cloud(file_path)
-    test_voxel = convert_pointcloud_to_voxel(test_cloud, voxel_size=.1)
-    test3dMatrix= build_filled_status_matrix(test_voxel)
+    test_voxel = convert_pointcloud_to_voxel(test_cloud, voxel_size=0.1)
+    test3dMatrix = build_filled_status_matrix(test_voxel)
 
     print(test3dMatrix)
-
 
     test_list = generate_until_valid(test3dMatrix)
     print(len(test_list))
     print(generateBrickGraphFromPieceList(test_list))
-    print(is_set_valid(generateBrickGraphFromPieceList(test_list,),0))
-
-
-
