@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
+
 const BrickStud = () => (
   <span className="inline-block w-3 h-3 rounded-full bg-[#C4A8E0]/50 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1),0_1px_1px_rgba(255,255,255,0.5)]" />
 );
@@ -35,9 +36,63 @@ const Navbar = () => {
                 <BrickStud />
               </div>
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-gray-800">
-              Brick<span className="text-[#9B6DC6]">Me</span>
-            </span>
+            <svg viewBox="0 0 1366 768" className="w-30 h-24 text-[#9B6DC6] [&_.st0]:stroke-[#9B6DC6]" aria-label="BrickMe">
+              <defs>
+                <style>{`.st0{fill:none;stroke:currentColor;stroke-miterlimit:10;stroke-width:18px}`}</style>
+              </defs>
+              <line className="st0" x1="108" y1="216" x2="108" y2="576"/>
+              <line className="st0" x1="396" y1="576" x2="108" y2="576"/>
+              <line className="st0" x1="180" y1="216" x2="108" y2="216"/>
+              <line className="st0" x1="180" y1="396" x2="180" y2="216"/>
+              <line className="st0" x1="684" y1="396" x2="180" y2="396"/>
+              <line className="st0" x1="396" y1="468" x2="396" y2="576"/>
+              <line className="st0" x1="468" y1="468" x2="396" y2="468"/>
+              <line className="st0" x1="468" y1="576" x2="468" y2="468"/>
+              <line className="st0" x1="756" y1="576" x2="468" y2="576"/>
+              <line className="st0" x1="324" y1="396" x2="324" y2="576"/>
+              <line className="st0" x1="396" y1="396" x2="396" y2="432"/>
+              <g>
+                <line className="st0" x1="180" y1="450" x2="252" y2="450"/>
+                <line className="st0" x1="252" y1="522" x2="252" y2="450"/>
+                <line className="st0" x1="180" y1="450" x2="180" y2="522"/>
+                <line className="st0" x1="252" y1="522" x2="180" y2="522"/>
+              </g>
+              <line className="st0" x1="468" y1="396" x2="468" y2="468"/>
+              <line className="st0" x1="540" y1="396" x2="540" y2="576"/>
+              <line className="st0" x1="468" y1="288" x2="468" y2="360"/>
+              <line className="st0" x1="540" y1="288" x2="468" y2="288"/>
+              <line className="st0" x1="540" y1="360" x2="540" y2="288"/>
+              <line className="st0" x1="468" y1="360" x2="540" y2="360"/>
+              <line className="st0" x1="684" y1="216" x2="684" y2="576"/>
+              <line className="st0" x1="756" y1="216" x2="684" y2="216"/>
+              <line className="st0" x1="756" y1="432" x2="756" y2="216"/>
+              <line className="st0" x1="828" y1="360" x2="756" y2="432"/>
+              <line className="st0" x1="900" y1="360" x2="828" y2="360"/>
+              <line className="st0" x1="792" y1="468" x2="900" y2="360"/>
+              <line className="st0" x1="900" y1="576" x2="792" y2="468"/>
+              <line className="st0" x1="756" y1="576" x2="756.03" y2="504"/>
+              <line className="st0" x1="828.03" y1="576.03" x2="756.03" y2="504.03"/>
+              <line className="st0" x1="900" y1="576" x2="828.03" y2="576.03"/>
+              <line className="st0" x1="864" y1="396" x2="864" y2="540"/>
+              <line className="st0" x1="1260" y1="396" x2="864" y2="396"/>
+              <line className="st0" x1="1260" y1="576" x2="900" y2="576"/>
+              <line className="st0" x1="1260" y1="396" x2="1260" y2="576"/>
+              <line className="st0" x1="1080" y1="396" x2="1080" y2="576"/>
+              <line className="st0" x1="972" y1="396" x2="972" y2="450"/>
+              <line className="st0" x1="936" y1="504" x2="936" y2="576"/>
+              <line className="st0" x1="1008" y1="504" x2="1008" y2="576"/>
+              <line className="st0" x1="1152" y1="522" x2="1260" y2="522"/>
+              <line className="st0" x1="684" y1="450" x2="594" y2="450"/>
+              <line className="st0" x1="594" y1="522" x2="594" y2="450"/>
+              <line className="st0" x1="684" y1="522" x2="594" y2="522"/>
+              <g>
+                <line className="st0" x1="1152" y1="432" x2="1152" y2="468"/>
+                <line className="st0" x1="1206" y1="432" x2="1152" y2="432"/>
+                <line className="st0" x1="1206" y1="468" x2="1152" y2="468"/>
+                <line className="st0" x1="1206" y1="432" x2="1206" y2="468"/>
+              </g>
+              <rect className="st0" x="486" y="270" width="36" height="18"/>
+            </svg>
           </Link>
 
           {/* Desktop links */}
