@@ -21,7 +21,7 @@ def get_3d_color_matrix_from_voxel_grid(voxel_grid):
 def generatePieceListFromColorMatrix(matrix):
     output_list = []
     for i in range(matrix.shape[0]):
-        list_to_add = generateLayerPieceList(matrix, i)
+        list_to_add = generateLayerPieceList(matrix[i], i)
         for item in list_to_add:
             output_list.append(item)
     return output_list
@@ -34,7 +34,13 @@ def generateLayerPieceList(layer, layerZIndex) :
         for j in range(layer.shape[1]):
             if to_fill_in_matrix[i, j] and layer[i][j] != "empty":
                 pieceSize, isRotated = findBiggestPiece(layer, to_fill_in_matrix, i, j, layer[i][j])
-                output_list.append(legoBrick.LegoBrick(i,j,layerZIndex,pieceSize[0],pieceSize[1], layer[i][j], isRotated))
+                pieceToAdd = legoBrick.LegoBrick(pieceSize[0],pieceSize[1], layer[i][j], isRotated)
+                pieceToAdd.set_location(i,j,layerZIndex)
+
+                #SET FILLED IN PLACES IN THE GRID TO NOT DOUBLE COUNT
+                for offset in pieceToAdd.offsetLocationsList:
+                    to_fill_in_matrix[offset[0]+i][offset[1]+j] = False
+                output_list.append(pieceToAdd)
     return output_list
 
 def findBiggestPiece(layer, filledInMatrix, x,y, color):
@@ -44,7 +50,9 @@ def findBiggestPiece(layer, filledInMatrix, x,y, color):
         offset_list = pieceToCheck.offsetLocationsList
         isValid = True
         for item in offset_list:
-            if filledInMatrix[item[0] + x][item[1] + y] == True or layer[item[0 + x]][item[1 + x]] != color:
+            if (filledInMatrix.shape[0] <= item[0] + x) or (filledInMatrix.shape[1] <= item[1] + y):
+                isValid = False
+            elif (filledInMatrix[item[0] + x][item[1] + y] == False) or layer[item[0]+x][item[1]+y] != color:
                 isValid = False
         if isValid:
             return pieceType, checkRotatedFirst
@@ -53,12 +61,14 @@ def findBiggestPiece(layer, filledInMatrix, x,y, color):
         offset_list = pieceToCheck.offsetLocationsList
         isValid = True
         for item in offset_list:
-            if filledInMatrix[item[0] + x][item[1] + y] == True or layer[item[0 + x]][item[1 + x]] != color:
+            if (filledInMatrix.shape[0] <= item[0] + x) or (filledInMatrix.shape[1] <= item[1] + y):
+                isValid = False
+            elif (filledInMatrix[item[0] + x][item[1] + y] == False) or layer[item[0]+x][item[1]+y] != color:
                 isValid = False
         if isValid:
             return pieceType, not checkRotatedFirst
 
-    print("Something went wrong checking piece:" + str(x) + "," + str(y)+ "---  no pieces were valid")
+    print("Something went wrong checking piece:" + str(x) + "," + str(y)+ "  ---  no pieces were valid")
     return [0,0], False
 
 def generateBrickGraphFromPieceList(pieceList):
@@ -98,3 +108,41 @@ def generateBrickGraphFromPieceList(pieceList):
                 graph.add_edge((-1, -1, -1), (x + offset[0], y + offset[1], z), capacity=1)
 
     return graph
+
+def is_set_valid(setGraph, requiredAvgConnectionCount):
+    flow_value_sum = 0
+    for node in setGraph.nodes:
+        if node != (-1,-1,-1):
+            flow_value, flow_dict = nx.maximum_flow(setGraph, (-1,-1,-1), node)
+            if flow_value < 1:
+                return False
+            flow_value_sum += flow_value
+    return requiredAvgConnectionCount < (flow_value_sum/(len(setGraph.nodes)-1))
+
+if __name__ == "__main__":
+    test3dMatrix = np.array([[["R","B","R"],
+                              ["R","R","R"],
+                              ["R", "R", "R"],
+                              ["R", "B", "R"]
+                              ],
+                             [["R", "B", "R"],
+                              ["R", "R", "R"],
+                              ["R", "R", "R"],
+                              ["R", "B", "R"]
+                              ],
+
+                             [["empty", "B", "R"],
+                              ["R", "empty", "R"],
+                              ["R", "R", "empty"],
+                              ["R", "empty", "R"]
+                              ]
+                             ])
+
+    test_list = generatePieceListFromColorMatrix(test3dMatrix)
+    print(len(test_list))
+    for brick in test_list:
+        print(brick)
+    print(generateBrickGraphFromPieceList(test_list))
+    print(is_set_valid(generateBrickGraphFromPieceList(test_list,),2))
+
+

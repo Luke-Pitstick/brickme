@@ -51,3 +51,6 @@ class LegoBrick:
             for i in range(self.length):
                 for j in range(self.width):
                     self.offsetLocationsList.append([j,i])
+
+    def __str__(self):
+        return "Color: " + str(self.color) + ", width: " + str(self.width) + ", length: " + str(self.length) + ", x: " + str(self.x) + ", y: " + str(self.y) + ", z: " + str(self.z)
