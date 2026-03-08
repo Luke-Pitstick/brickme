@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 function centerAndScaleModel(model, THREE) {
   model.position.set(0, 0, 0);
@@ -53,6 +54,16 @@ function loadModelFromUrl(url, loader, scene, THREE, onDone, onError) {
   );
 }
 
+// Read a File as a base64 data-URL so we can stash it in sessionStorage
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result); // full data-URL e.g. "data:model/gltf-binary;base64,..."
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ModelViewer() {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -63,6 +74,9 @@ export default function ModelViewer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [threeMounted, setThreeMounted] = useState(false);
+  // Only true once a model has fully loaded — controls button visibility
+  const [modelReady, setModelReady] = useState(false);
+  const router = useRouter();
 
   const doLoad = useRef(null);
 
@@ -113,7 +127,6 @@ export default function ModelViewer() {
         scene.add(new THREE.GridHelper(50, 50, 0x444444, 0x222222));
         loaderRef.current = new GLTFLoader();
 
-        // Define doLoad now that everything is ready
         doLoad.current = (url) => {
           if (!url) return;
           if (modelRef.current) {
@@ -123,9 +136,10 @@ export default function ModelViewer() {
           setLoading(true);
           setError("");
           setFileName("Generated Model");
+          setModelReady(false);
           loadModelFromUrl(
             url, loaderRef.current, scene, THREE,
-            (model) => { modelRef.current = model; setLoading(false); },
+            (model) => { modelRef.current = model; setLoading(false); setModelReady(true); },
             (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); }
           );
         };
@@ -148,8 +162,6 @@ export default function ModelViewer() {
         window.addEventListener("resize", handleResize);
         setThreeMounted(true);
 
-        // Try immediately, then retry a few times in case Next.js
-        // hasn't committed the URL to window.location yet
         let attempts = 0;
         const tryLoadFromUrl = () => {
           const params = new URLSearchParams(window.location.search);
@@ -173,7 +185,7 @@ export default function ModelViewer() {
     });
   }, []);
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -187,30 +199,59 @@ export default function ModelViewer() {
       return;
     }
 
-    const url = URL.createObjectURL(file);
+    setLoading(true);
+    setError("");
+    setModelReady(false);
     setFileName(file.name);
 
-    if (modelRef.current) {
+    try {
+      // Convert file → base64 and cache in sessionStorage so the
+      // instructions page can reconstruct a blob URL from it.
+      const dataUrl = await fileToBase64(file);
+      sessionStorage.setItem("uploadedModelDataUrl", dataUrl);
+      sessionStorage.setItem("uploadedModelName", file.name);
+    } catch (err) {
+      console.warn("Could not store model in sessionStorage:", err);
+    }
+
+    // Also create a short-lived blob URL for the viewer on this page
+    const blobUrl = URL.createObjectURL(file);
+
+    if (modelRef.current && sceneRef.current) {
       sceneRef.current.remove(modelRef.current);
       modelRef.current = null;
     }
 
-    setLoading(true);
-    setError("");
-
     loadModelFromUrl(
-      url,
+      blobUrl,
       loaderRef.current,
       sceneRef.current,
       THREERef.current,
-      (model) => { modelRef.current = model; setLoading(false); URL.revokeObjectURL(url); },
-      (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); URL.revokeObjectURL(url); }
+      (model) => {
+        modelRef.current = model;
+        setLoading(false);
+        setModelReady(true);
+        URL.revokeObjectURL(blobUrl);
+      },
+      (err) => {
+        setError("Failed to load model: " + (err.message || "Unknown error"));
+        setLoading(false);
+        URL.revokeObjectURL(blobUrl);
+      }
     );
   };
 
+  const handleGoToInstructions = () => {
+    router.push("/instructions");
+  };
+
   return (
-    <div className="w-full h-screen flex flex-col bg-gray-900">
-      <div className="bg-gray-800 text-white p-6 shadow-lg z-10">
+    <div
+      className="w-full h-screen flex flex-col bg-gray-900"
+      style={{ position: "relative" }}
+    >
+      {/* ── Header ── */}
+      <div className="bg-gray-800 text-white p-6 shadow-lg" style={{ zIndex: 10, position: "relative" }}>
         <h1 className="text-3xl font-bold mb-4">3D Model Viewer</h1>
 
         <div className="flex items-center gap-4 flex-wrap">
@@ -228,7 +269,7 @@ export default function ModelViewer() {
           {fileName && (
             <div className="text-sm">
               <span className="text-gray-300">Loaded: </span>
-              <span className="text-[#9B6DC6] font-semibent">{fileName}</span>
+              <span className="text-[#9B6DC6] font-semibold">{fileName}</span>
             </div>
           )}
 
@@ -247,10 +288,11 @@ export default function ModelViewer() {
         {error && <div className="mt-3 text-red-400 text-sm">{error}</div>}
       </div>
 
+      {/* ── 3D Viewport ── */}
       <div
         ref={containerRef}
-        className="flex-1 bg-gray-800 relative overflow-hidden"
-        style={{ width: "100%", height: "100%" }}
+        className="flex-1 bg-gray-800 overflow-hidden"
+        style={{ width: "100%", position: "relative" }}
       >
         {!threeMounted && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
@@ -261,6 +303,55 @@ export default function ModelViewer() {
           </div>
         )}
       </div>
+
+      {/* ── Instructions button — only visible once a model is loaded ── */}
+      {modelReady && (
+        <button
+          onClick={handleGoToInstructions}
+          style={{
+            position: "fixed",
+            bottom: "28px",
+            right: "28px",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "12px 22px",
+            borderRadius: "12px",
+            border: "none",
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: "15px",
+            color: "#fff",
+            background: "linear-gradient(135deg, #9B6DC6 0%, #6B3FA0 100%)",
+            boxShadow: "0 4px 24px rgba(155,109,198,0.55), 0 2px 8px rgba(0,0,0,0.5)",
+            letterSpacing: "0.03em",
+            transition: "transform 0.15s, box-shadow 0.15s",
+            animation: "fadeInUp 0.35s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.07)";
+            e.currentTarget.style.boxShadow = "0 8px 36px rgba(155,109,198,0.75), 0 2px 8px rgba(0,0,0,0.5)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "0 4px 24px rgba(155,109,198,0.55), 0 2px 8px rgba(0,0,0,0.5)";
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </svg>
+          Instructions
+        </button>
+      )}
+
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

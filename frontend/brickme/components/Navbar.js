@@ -17,7 +17,6 @@ const Navbar = () => {
   const navLinks = [
     { href: "/Home", label: "Home" },
     { href: "/My_Builds", label: "My Builds" },
-    { href: "/Create", label: "Create" },
     { href: "/Test", label: "3D Viewer" },
   ];
 
