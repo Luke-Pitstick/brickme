@@ -2,6 +2,8 @@ import open3d as o3d
 import os
 from tkinter import filedialog
 import tkinter as tk
+from src.three_d.convertPointCloudtoVoxel import convert_pointcloud_to_voxel
+from src.three_d.glbToPointCloud import glb_to_point_cloud
 
 def get_file_path():
     root = tk.Tk()
@@ -16,16 +18,12 @@ def display_voxel(file_path: str):
 
     # Read the triangle mesh model from the .glb file
     # Open3D supports reading rich 3D models with PBR materials
-    voxel_grid = o3d.io.read_triangle_model(file_path)
+    point_cloud = glb_to_point_cloud(file_path, number_of_points=200000)
+    voxel_grid = convert_pointcloud_to_voxel(point_cloud, voxel_size=0.08)    
 
-    if not voxel_grid.meshes:
-        print(f"Error: No meshes found in the model at {file_path}")
-        return
-
-    print(f"Successfully loaded model from {file_path}")
+    print(f"Successfully loaded voxel grid from {file_path}")
     print("Starting visualization. Press 'h' inside the window for controls.")
 
-    # Visualize the geometries
     o3d.visualization.draw(voxel_grid)
 
 if __name__ == "__main__":

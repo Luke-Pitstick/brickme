@@ -196,7 +196,7 @@ class MeshyClient:
     
 if __name__ == "__main__":
     meshy_client = MeshyClient()
-    meshy_client.process_image_to_3d("../../public/images/ps5controller.png")
+    meshy_client.process_image_to_3d("../../public/images/coffeecup.png")
     
     
     
