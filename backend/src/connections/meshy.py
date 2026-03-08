@@ -5,9 +5,10 @@ import base64
 import json
 import uuid
 from pathlib import Path
-from src.three_d.lego_pipeline import convert_meshy_model_to_lego
+from src.three_d.lego_pipeline import build_lego_package
 
 from .redisconnect import RedisClient
+from ..three_d.lego_pipeline import build_lego_package
 
 try:
     from supabase import create_client, Client
@@ -151,9 +152,13 @@ class MeshyClient:
 
         lego_model_path = str(self._output_dir() / f"lego_model_{task_id_image_to_3d}.glb")
 
-        final_model_path = convert_meshy_model_to_lego(
-            model_path,
-            lego_model_path
+        job_dir = self._output_dir() / "jobs" / task_id_image_to_3d
+        job_dir.mkdir(parents=True, exist_ok=True)
+
+        result = build_lego_package(
+            input_glb_path=str(model_path),
+            job_dir=str(job_dir),
+            public_base=f"http://localhost:8000/output/jobs/{task_id_image_to_3d}",
         )
 
-        return self.upload_model_to_supabase(final_model_path, task_id_image_to_3d)
+        return result

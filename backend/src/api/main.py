@@ -88,11 +88,11 @@ REDIS_KEY_PREFIX = "meshy:task:"
 def _run_meshy_and_store_result(meshy: MeshyClient, task_id: str, cdn_url: str):
     redis = meshy.redis_client
     try:
-        result_url = meshy.process_image_to_3d(cdn_url)
-        if result_url:
+        result_payload = meshy.process_image_to_3d(cdn_url)
+        if result_payload:
             redis.set(
                 f"{REDIS_KEY_PREFIX}{task_id}",
-                json.dumps({"status": "succeeded", "result": result_url})
+                json.dumps({"status": "succeeded", "result": result_payload})
             )
         else:
             redis.set(
@@ -176,3 +176,20 @@ async def delete_build(build_id: str):
     new_builds = [b for b in builds if b["id"] != build_id]
     _write_builds(new_builds)
     return {"message": "Build deleted"}
+
+@app.post("/rerun-lego/{job_id}")
+async def rerun_lego(job_id: str):
+    job_dir = OUTPUT_DIR / "jobs" / job_id
+    raw_glb_path = job_dir / "meshy_raw.glb"
+
+    if not raw_glb_path.exists():
+        raise HTTPException(status_code=404, detail="No saved Meshy model for that job")
+
+    from src.three_d.lego_pipeline import build_lego_package
+
+    result = build_lego_package(
+        input_glb_path=str(raw_glb_path),
+        job_dir=str(job_dir),
+        public_base=f"http://localhost:8000/output/jobs/{job_id}"
+    )
+    return {"job_id": job_id, "result": result}

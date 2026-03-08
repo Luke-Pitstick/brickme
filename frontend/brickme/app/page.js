@@ -64,34 +64,75 @@ const Home = () => {
       });
 
       if (result.status === "succeeded") {
-        setStep(STEPS.DONE);
-        setResultUrl(result.result);
-        setStatusMsg("Conversion complete!");
+          const payload = result.result;
 
-        // Store model URL for viewer
-        if (typeof window !== "undefined") {
-          localStorage.setItem("modelUrl", result.result);
-        }
+          console.log("FULL RESULT:", result);
+          console.log("PAYLOAD:", payload);
 
-        // Auto-save if logged in
-        if (user) {
-          try {
-            await saveBuild({
-              userId: user.id,
-              imageUrl: cdnUrl,
-              modelUrl: result.result,
-            });
-            setSaved(true);
-          } catch {
-            // Don't block the flow if save fails
+          let modelUrl = payload?.model_url;
+          const jobId = payload?.job_id;
+          const instructions = payload?.instructions;
+
+          // Defensive normalization in case model_url is wrapped oddly
+          if (modelUrl && typeof modelUrl === "object") {
+            modelUrl =
+              modelUrl.url ||
+              modelUrl.model_url ||
+              modelUrl.href ||
+              null;
           }
-        }
 
-        // Redirect to 3D viewer after a short delay
-        setTimeout(() => {
-          router.push("/Test");
-        }, 1500);
-      } else {
+          console.log("NORMALIZED modelUrl:", modelUrl, typeof modelUrl);
+
+          if (!modelUrl || typeof modelUrl !== "string" || modelUrl === "[object Object]") {
+            console.error("Invalid model_url from backend:", modelUrl);
+            throw new Error("Backend succeeded but returned an invalid model_url");
+          }
+
+          setStep(STEPS.DONE);
+          setResultUrl(modelUrl);
+          setStatusMsg("Conversion complete!");
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem("modelUrl", modelUrl);
+
+            if (jobId) {
+              localStorage.setItem("jobId", jobId);
+            }
+
+            localStorage.setItem("conversionResult", JSON.stringify(payload));
+
+            if (instructions) {
+              localStorage.setItem("instructions", JSON.stringify(instructions));
+            }
+          }
+
+          if (user) {
+            try {
+              await saveBuild({
+                userId: user.id,
+                imageUrl: cdnUrl,
+                modelUrl: modelUrl,
+              });
+              setSaved(true);
+            } catch (err) {
+              console.error("saveBuild failed:", err);
+            }
+          }
+
+          console.log("ABOUT TO STORE modelUrl:", modelUrl, typeof modelUrl);
+            console.log("ABOUT TO STORE payload:", payload);
+
+            if (typeof window !== "undefined") {
+              localStorage.setItem("modelUrl", String(modelUrl));
+              console.log("STORED modelUrl:", localStorage.getItem("modelUrl"));
+            }
+
+            // TEMP: do not redirect yet
+            // setTimeout(() => {
+            //   router.push(`/Test?modelUrl=${encodeURIComponent(modelUrl)}`);
+            // }, 1500);
+        } else {
         setStep(STEPS.ERROR);
         setError(result.error || "Conversion failed");
         setStatusMsg("");
@@ -113,6 +154,9 @@ const Home = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 gap-6">
+      <p style={{ color: "red", fontWeight: "bold", fontSize: "20px" }}>
+        DEBUG VERSION 1
+      </p>
       <h1 className="text-3xl font-bold text-gray-800 mb-4">Convert to LEGO</h1>
 
       {/* Upload / preview area */}

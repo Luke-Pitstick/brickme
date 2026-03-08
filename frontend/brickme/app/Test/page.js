@@ -127,21 +127,57 @@ export default function ModelViewer() {
         scene.add(new THREE.GridHelper(50, 50, 0x444444, 0x222222));
         loaderRef.current = new GLTFLoader();
 
-        doLoad.current = (url) => {
-          if (!url) return;
+        doLoad.current = async (url) => {
+          if (!url || typeof url !== "string") return;
+
           if (modelRef.current) {
             scene.remove(modelRef.current);
             modelRef.current = null;
           }
+
           setLoading(true);
           setError("");
           setFileName("Generated Model");
           setModelReady(false);
-          loadModelFromUrl(
-            url, loaderRef.current, scene, THREE,
-            (model) => { modelRef.current = model; setLoading(false); setModelReady(true); },
-            (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); }
-          );
+
+          let blobUrl = null;
+
+          try {
+            console.log("Auto-loading model from:", url);
+
+            const res = await fetch(url);
+            if (!res.ok) {
+              throw new Error(`Model fetch failed: ${res.status} ${res.statusText}`);
+            }
+
+            const blob = await res.blob();
+            console.log("Fetched model blob:", blob.size, "bytes", blob.type);
+
+            blobUrl = URL.createObjectURL(blob);
+
+            loadModelFromUrl(
+              blobUrl,
+              loaderRef.current,
+              scene,
+              THREE,
+              (model) => {
+                modelRef.current = model;
+                setLoading(false);
+                setModelReady(true);
+                if (blobUrl) URL.revokeObjectURL(blobUrl);
+              },
+              (err) => {
+                setError("Failed to load model: " + (err.message || "Unknown error"));
+                setLoading(false);
+                if (blobUrl) URL.revokeObjectURL(blobUrl);
+              }
+            );
+          } catch (err) {
+            console.error("Auto-load failed:", err);
+            setError("Failed to auto-load model: " + (err.message || "Unknown error"));
+            setLoading(false);
+            if (blobUrl) URL.revokeObjectURL(blobUrl);
+          }
         };
 
         const animate = () => {
@@ -165,12 +201,35 @@ export default function ModelViewer() {
         let attempts = 0;
         const tryLoadFromUrl = () => {
           const params = new URLSearchParams(window.location.search);
-          const modelUrl = params.get("modelUrl");
-          if (modelUrl) {
+          const modelUrlRaw =
+            params.get("modelUrl") ||
+            (typeof window !== "undefined" ? localStorage.getItem("modelUrl") : null);
+
+          let modelUrl = modelUrlRaw;
+
+          if (typeof modelUrlRaw === "string") {
+            const trimmed = modelUrlRaw.trim();
+
+            if (trimmed.startsWith("{")) {
+              try {
+                const parsed = JSON.parse(trimmed);
+                modelUrl = parsed?.model_url || parsed?.result?.model_url || null;
+              } catch {
+                modelUrl = modelUrlRaw;
+              }
+            }
+          }
+
+          console.log("Resolved modelUrlRaw:", modelUrlRaw);
+          console.log("Resolved modelUrl:", modelUrl);
+
+          if (modelUrl && typeof modelUrl === "string" && modelUrl !== "[object Object]") {
             doLoad.current(modelUrl);
           } else if (attempts < 10) {
             attempts++;
             setTimeout(tryLoadFromUrl, 150);
+          } else {
+            setError("No valid generated model URL found.");
           }
         };
         tryLoadFromUrl();
