@@ -17,6 +17,7 @@ class LegoBrick:
             for i in range(length):
                 for j in range(width):
                     self.offsetLocationsList.append([j,i])
+                    
     def __init__(self, width, length, color, rotated):
         self.width = width
         self.length = length
