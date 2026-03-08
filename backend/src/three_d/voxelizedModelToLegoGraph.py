@@ -268,9 +268,23 @@ def generate_until_valid(colorMatrix):
         if foundValid:
             return pieceList
 
-        for i in range(invalidLocation[2]):
-            print(f"Adding Pillar at :: {invalidLocation[0]},{invalidLocation[1]},{i}")
-            colorMatrix[i][invalidLocation[0]][invalidLocation[1]] = ("original", "clear")
+        print(f"Adding Pillar at :: {invalidLocation[0]},{invalidLocation[1]},{invalidLocation[2]-1}")
+        print("Finding Best Pillar Color")
+        surroundingColors = []
+        if colorMatrix.shape[1] < invalidLocation[0] + 1 and colorMatrix[invalidLocation[2]-1][invalidLocation[0] + 1][invalidLocation[1]] != "empty":
+            surroundingColors.append(colorMatrix[invalidLocation[2]-1][invalidLocation[0] + 1][invalidLocation[1]][1])
+        if colorMatrix.shape[2] < invalidLocation[1] + 1 and colorMatrix[invalidLocation[2]-1][invalidLocation[0]][invalidLocation[1] + 1] != "empty":
+            surroundingColors.append(colorMatrix[invalidLocation[2]-1][invalidLocation[0]][invalidLocation[1] + 1][1])
+        if 0 >= invalidLocation[0] - 1 and colorMatrix[invalidLocation[2]-1][invalidLocation[0] - 1][invalidLocation[1]] != "empty":
+            surroundingColors.append(colorMatrix[invalidLocation[2]-1][invalidLocation[0] - 1][invalidLocation[1]][1])
+        if 0 >= invalidLocation[1] - 1 and colorMatrix[invalidLocation[2]-1][invalidLocation[0]][invalidLocation[1]-1] != "empty":
+            surroundingColors.append(colorMatrix[invalidLocation[2]-1][invalidLocation[0]][invalidLocation[1] - 1][1])
+
+        colorToAdd = colorMatrix[invalidLocation[2]][invalidLocation[0]][invalidLocation[1]][1]
+        if len(surroundingColors) > 0:
+            colorToAdd = surroundingColors[0]
+
+        colorMatrix[invalidLocation[2]-1][invalidLocation[0]][invalidLocation[1]] = ("original", colorToAdd)
 
     return None
 
@@ -286,4 +300,4 @@ if __name__ == "__main__":
     test_list = generate_until_valid(test3dMatrix)
     print(len(test_list))
     print(generateBrickGraphFromPieceList(test_list))
-    out_file = save_model(test_list, "../../public/models/lego_model.glb")
+    out_file = save_model(test_list, "../../public/models/lego_model_2.glb")
