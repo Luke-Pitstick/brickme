@@ -7,6 +7,7 @@ from tkinter import filedialog
 import numpy as np
 from scipy.ndimage import binary_fill_holes
 from scipy.spatial import cKDTree
+from legoRenderer import save_model
 
 # ---------------------------
 # Constants / shared setup
@@ -258,7 +259,7 @@ def is_set_valid(setGraph, requiredAvgConnectionCount):
 def generate_until_valid(colorMatrix):
     attemptCount = 0
 
-    while attemptCount < 100:
+    while attemptCount < 100000:
         attemptCount += 1
         pieceList = generatePieceListFromColorMatrix(colorMatrix)
         graph = generateBrickGraphFromPieceList(pieceList)
@@ -269,7 +270,7 @@ def generate_until_valid(colorMatrix):
 
         for i in range(invalidLocation[2]):
             print(f"Adding Pillar at :: {invalidLocation[0]},{invalidLocation[1]},{i}")
-            colorMatrix[i][invalidLocation[0]][invalidLocation[1]] = ("original", "transparent")
+            colorMatrix[i][invalidLocation[0]][invalidLocation[1]] = ("original", "clear")
 
     return None
 
@@ -285,3 +286,4 @@ if __name__ == "__main__":
     test_list = generate_until_valid(test3dMatrix)
     print(len(test_list))
     print(generateBrickGraphFromPieceList(test_list))
+    out_file = save_model(test_list, "../../public/models/lego_model.glb")
