@@ -1,0 +1,8 @@
+[project]
+name = "brickme-backend"
+version = "0.1.0"
+description = "BrickMe hackathon backend"
+requires-python = ">=3.10"
+
+[tool.fastapi]
+entrypoint = "src.api.main:app"

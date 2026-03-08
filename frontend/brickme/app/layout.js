@@ -1,23 +1,18 @@
-
-
-import React from 'react';
 import Navbar from "@/components/Navbar";
-import '@/app/global.css';
-
+import { AuthProvider } from "@/context/AuthContext";
+import "@/app/globals.css";
 
 const Layout = ({ children }) => {
-    return (
-        <html lang="en">
-
-            <body>
-                <div>
-                    <Navbar />
-                    <main>{children}</main>
-                </div>
-            </body>
-        </html>
-
-    );
+  return (
+    <html lang="en">
+      <body>
+        <AuthProvider>
+          <Navbar />
+          <main>{children}</main>
+        </AuthProvider>
+      </body>
+    </html>
+  );
 };
 
 export default Layout;
