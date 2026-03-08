@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 
 function centerAndScaleModel(model, THREE) {
   model.position.set(0, 0, 0);
@@ -27,7 +26,6 @@ function centerAndScaleModel(model, THREE) {
   model.rotation.x = -Math.PI / 2;
   model.updateMatrixWorld(true);
 
-  // Sit flush on grid
   const finalBox = new THREE.Box3().setFromObject(model);
   model.position.y -= finalBox.min.y;
 }
@@ -55,38 +53,19 @@ function loadModelFromUrl(url, loader, scene, THREE, onDone, onError) {
   );
 }
 
-function ModelViewerInner() {
-  const searchParams = useSearchParams();
+export default function ModelViewer() {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
   const modelRef = useRef(null);
   const loaderRef = useRef(null);
   const THREERef = useRef(null);
-  const readyRef = useRef(false);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [threeMounted, setThreeMounted] = useState(false);
 
-  const loadUrl = useRef((modelUrl) => {
-    if (modelRef.current) {
-      sceneRef.current.remove(modelRef.current);
-      modelRef.current = null;
-    }
-    setLoading(true);
-    setError("");
-    setFileName("Generated Model");
-    loadModelFromUrl(
-      modelUrl,
-      loaderRef.current,
-      sceneRef.current,
-      THREERef.current,
-      (model) => { modelRef.current = model; setLoading(false); },
-      (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); }
-    );
-  });
+  const doLoad = useRef(null);
 
-  // Initialize Three.js once — then immediately load model from window.location
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -132,8 +111,24 @@ function ModelViewerInner() {
         controls.update();
 
         scene.add(new THREE.GridHelper(50, 50, 0x444444, 0x222222));
-
         loaderRef.current = new GLTFLoader();
+
+        // Define doLoad now that everything is ready
+        doLoad.current = (url) => {
+          if (!url) return;
+          if (modelRef.current) {
+            scene.remove(modelRef.current);
+            modelRef.current = null;
+          }
+          setLoading(true);
+          setError("");
+          setFileName("Generated Model");
+          loadModelFromUrl(
+            url, loaderRef.current, scene, THREE,
+            (model) => { modelRef.current = model; setLoading(false); },
+            (err) => { setError("Failed to load model: " + (err.message || "Unknown error")); setLoading(false); }
+          );
+        };
 
         const animate = () => {
           requestAnimationFrame(animate);
@@ -151,14 +146,22 @@ function ModelViewerInner() {
           renderer.setSize(w, h);
         };
         window.addEventListener("resize", handleResize);
-
-        readyRef.current = true;
         setThreeMounted(true);
 
-        // Read directly from window.location — bypasses React render timing issues
-        const params = new URLSearchParams(window.location.search);
-        const modelUrl = params.get("modelUrl");
-        if (modelUrl) loadUrl.current(modelUrl);
+        // Try immediately, then retry a few times in case Next.js
+        // hasn't committed the URL to window.location yet
+        let attempts = 0;
+        const tryLoadFromUrl = () => {
+          const params = new URLSearchParams(window.location.search);
+          const modelUrl = params.get("modelUrl");
+          if (modelUrl) {
+            doLoad.current(modelUrl);
+          } else if (attempts < 10) {
+            attempts++;
+            setTimeout(tryLoadFromUrl, 150);
+          }
+        };
+        tryLoadFromUrl();
 
         return () => {
           window.removeEventListener("resize", handleResize);
@@ -169,14 +172,6 @@ function ModelViewerInner() {
       }
     });
   }, []);
-
-  // Handle URL changes after init (e.g. user navigates to a different model)
-  useEffect(() => {
-    if (!readyRef.current) return; // first load is handled inside init
-    const modelUrl = searchParams.get("modelUrl");
-    if (!modelUrl) return;
-    loadUrl.current(modelUrl);
-  }, [searchParams]);
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
@@ -192,16 +187,16 @@ function ModelViewerInner() {
       return;
     }
 
-    setLoading(true);
-    setError("");
-    setFileName(file.name);
-
     const url = URL.createObjectURL(file);
+    setFileName(file.name);
 
     if (modelRef.current) {
       sceneRef.current.remove(modelRef.current);
       modelRef.current = null;
     }
+
+    setLoading(true);
+    setError("");
 
     loadModelFromUrl(
       url,
@@ -233,7 +228,7 @@ function ModelViewerInner() {
           {fileName && (
             <div className="text-sm">
               <span className="text-gray-300">Loaded: </span>
-              <span className="text-[#9B6DC6] font-semibold">{fileName}</span>
+              <span className="text-[#9B6DC6] font-semibent">{fileName}</span>
             </div>
           )}
 
@@ -267,20 +262,5 @@ function ModelViewerInner() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function ModelViewer() {
-  return (
-    <Suspense fallback={
-      <div className="w-full h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-white text-center">
-          <div className="w-12 h-12 border-4 border-[#9B6DC6] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p>Loading viewer...</p>
-        </div>
-      </div>
-    }>
-      <ModelViewerInner />
-    </Suspense>
   );
 }
