@@ -19,7 +19,7 @@ def display_voxel(file_path: str):
     # Read the triangle mesh model from the .glb file
     # Open3D supports reading rich 3D models with PBR materials
     point_cloud = glb_to_point_cloud(file_path, number_of_points=200000)
-    voxel_grid = convert_pointcloud_to_voxel(point_cloud, voxel_size=0.08)    
+    voxel_grid = convert_pointcloud_to_voxel(point_cloud, voxel_size=0.03)
 
     print(f"Successfully loaded voxel grid from {file_path}")
     print("Starting visualization. Press 'h' inside the window for controls.")

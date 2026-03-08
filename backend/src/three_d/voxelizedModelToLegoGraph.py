@@ -3,18 +3,101 @@ import open3d as o3d
 import random
 import legoBrick
 import networkx as nx
+from convertPointCloudtoVoxel import convert_pointcloud_to_voxel
+from glbToPointCloud import glb_to_point_cloud
+import tkinter as tk
+from tkinter import filedialog
+from voxel_grid_filler import fill_hollow_voxel_grid_nearest_color
 
 pieceSizesList = [[4,2],[3,2],[2,2],[4,1],[2,1],[1,1]]
 
+lego_colors = {
+"Black": "#1B2A34",
+"Blue": "#0055BF",
+"Bright Green": "#4B9F4A",
+"Bright Light Blue": "#9FC3E9",
+"Bright Pink": "#FF9ECD",
+"Brown": "#6B3F22",
+"Dark Blue": "#0A3463",
+"Dark Bluish Gray": "#6D6E5C",
+"Dark Gray": "#6D6E6C",
+"Dark Orange": "#A95500",
+"Dark Pink": "#C870A0",
+"Dark Purple": "#3F2A56",
+"Dark Red": "#720E0F",
+"Green": "#237841",
+"Light Bluish Gray": "#A0A5A9",
+"Light Gray": "#9BA19D",
+"Lime": "#BBE90B",
+"Magenta": "#923978",
+"Medium Blue": "#5A93DB",
+"Olive Green": "#9B9A5A",
+"Orange": "#FE8A18",
+"Red": "#C91A09",
+"Reddish Brown": "#582A12",
+"Sand Blue": "#6074A1",
+"Sand Green": "#A0BCAC",
+"Tan": "#E4CD9E",
+"White": "#FFFFFF",
+"Yellow": "#F2CD37"
+}
 
 
-def get_3d_color_matrix_from_voxel_grid(voxel_grid):
-    bounds = voxel_grid.get_max_bound()
-    matrix = np.full(bounds, "empty", dtype=str)
-    for i in range(bounds.shape[0]):
-        for j in range(bounds.shape[1]):
-            for k in range(bounds.shape[2]):
-                matrix[i, j, k] = voxel_grid.get_voxel(i, j, k).color
+
+def hex_to_rgb(hex_color):
+    """Convert hex to RGB tuple."""
+    hex_color = hex_color.lstrip('#')
+    return np.array([int(hex_color[i:i+2], 16) for i in (0, 2, 4)])
+lego_rgb = {name: hex_to_rgb(hex_code) for name, hex_code in lego_colors.items()}
+
+def get_file_path():
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(filetypes=[("GLB files", "*.glb")])
+    return file_path
+
+
+def rgb_to_closest_lego_hex(rgb):
+    """
+    rgb: Open3D color (float values 0-1)
+    returns closest LEGO hex code
+    """
+    rgb = np.array(rgb) * 255
+
+    best_hex = None
+    best_dist = float('inf')
+
+    for name, color_rgb in lego_rgb.items():
+        dist = np.linalg.norm(rgb - color_rgb)
+        if dist < best_dist:
+            best_dist = dist
+            best_hex = lego_colors[name]
+
+    return best_hex
+
+def voxel_grid_to_hex_matrix(voxel_grid):
+    voxels = voxel_grid.get_voxels()
+
+    if len(voxels) == 0:
+        return np.empty((0,0,0), dtype=object)
+
+    # Collect voxel indices
+    indices = np.array([v.grid_index for v in voxels])
+
+    # Determine bounding box
+    min_idx = indices.min(axis=0)
+    max_idx = indices.max(axis=0)
+
+    shape = max_idx - min_idx + 1
+
+    # Create 3D matrix filled with "empty"
+    matrix = np.full(shape, "empty", dtype=object)
+
+    # Fill with voxel hex colors
+    for v in voxels:
+        idx = np.array(v.grid_index) - min_idx
+        hex_color = rgb_to_closest_lego_hex(v.color)
+        matrix[tuple(idx)] = hex_color
 
     return matrix
 
@@ -120,29 +203,20 @@ def is_set_valid(setGraph, requiredAvgConnectionCount):
     return requiredAvgConnectionCount < (flow_value_sum/(len(setGraph.nodes)-1))
 
 if __name__ == "__main__":
-    test3dMatrix = np.array([[["R","B","R"],
-                              ["R","R","R"],
-                              ["R", "R", "R"],
-                              ["R", "B", "R"]
-                              ],
-                             [["R", "B", "R"],
-                              ["R", "R", "R"],
-                              ["R", "R", "R"],
-                              ["R", "B", "R"]
-                              ],
+    file_path = get_file_path()
+    test_cloud = glb_to_point_cloud(file_path)
+    test_voxel = convert_pointcloud_to_voxel(test_cloud)
+    test_voxel_filled = fill_hollow_voxel_grid_nearest_color(test_voxel)
 
-                             [["empty", "B", "R"],
-                              ["R", "empty", "R"],
-                              ["R", "R", "empty"],
-                              ["R", "empty", "R"]
-                              ]
-                             ])
+
+    test3dMatrix = voxel_grid_to_hex_matrix(test_voxel_filled)
 
     test_list = generatePieceListFromColorMatrix(test3dMatrix)
     print(len(test_list))
     for brick in test_list:
         print(brick)
     print(generateBrickGraphFromPieceList(test_list))
-    print(is_set_valid(generateBrickGraphFromPieceList(test_list,),2))
+    print(is_set_valid(generateBrickGraphFromPieceList(test_list,),0))
+
 
 
