@@ -45,7 +45,19 @@ def get_meshy_client() -> MeshyClient:
 
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+
+# Initialize Supabase client if credentials are available
+supabase: Client = None
+if url and key and not url.startswith("your_"):
+    try:
+        supabase = create_client(url, key)
+        print(f"✓ Supabase client initialized")
+    except Exception as e:
+        print(f"⚠ Warning: Could not initialize Supabase: {e}")
+        print(f"  Update your .env file with valid Supabase credentials")
+else:
+    print(f"⚠ Warning: Supabase credentials not configured")
+    print(f"  Update your .env file with valid Supabase credentials")
 
 REDIS_KEY_PREFIX = "meshy:task:"
 
@@ -53,6 +65,14 @@ REDIS_KEY_PREFIX = "meshy:task:"
 @app.post("/upload-image")
 async def upload_image(file: UploadFile = File(...)):
     """Upload an image to Supabase Storage and return its public CDN URL."""
+    if not url or not key:
+        # For development/testing: return a mock URL when Supabase is not configured
+        print("⚠ Warning: Supabase not configured, returning mock URL for development")
+        ext = file.filename.split(".")[-1] if file.filename else "png"
+        mock_filename = f"mock-{uuid.uuid4()}.{ext}"
+        mock_url = f"http://localhost:8000/mock-images/{mock_filename}"
+        return {"cdn_url": mock_url}
+
     import requests as http_requests
 
     ext = file.filename.split(".")[-1] if file.filename else "png"
@@ -140,6 +160,10 @@ async def get_result(task_id: str, meshy_client: MeshyClient = Depends(get_meshy
 @app.on_event("startup")
 async def create_builds_table():
     """Create builds table if it doesn't exist."""
+    if not url or not key or url.startswith("your_"):
+        print("[startup] Skipping builds table creation - Supabase not configured")
+        return
+    
     import requests as http_requests
     sql = """
     CREATE TABLE IF NOT EXISTS public.builds (

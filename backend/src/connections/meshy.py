@@ -188,6 +188,15 @@ class MeshyClient:
 
     def process_image_to_3d(self, image_input: str) -> str | None:
         """image_input can be a local file path or a CDN/HTTP URL."""
+        if not self.api_key:
+            # For development/testing: return a mock 3D model URL when API key is not configured
+            print("⚠ Warning: Meshy API key not configured, returning mock 3D model URL for development")
+            import uuid
+            mock_model_id = str(uuid.uuid4())
+            # Return a sample GLB model URL that can be loaded by Three.js
+            # Using a publicly available sample model for testing
+            return "https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf"
+
         image_path = self._resolve_image_path(image_input)
         task_id_image_to_3d = self.convert_image_to_mesh(image_path)["result"]
         result = self.stream_image_to_3d_progress(task_id_image_to_3d)
