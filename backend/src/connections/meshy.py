@@ -2,9 +2,10 @@ import requests
 from dotenv import load_dotenv
 import os
 import base64
-from pprint import pprint
-from redisconnect import RedisClient
+
+from .redisconnect import RedisClient
 import json
+from supabase import create_client, Client
 
 class MeshyClient:
     def __init__(self):
@@ -15,6 +16,8 @@ class MeshyClient:
             "Authorization": f"Bearer {self.api_key}"
         }
         self.redis_client = RedisClient()
+        self.supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+        
         
     def convert_image_to_mesh(self, image_path: str) -> str:
         with open(image_path, "rb") as image_file:
@@ -132,13 +135,20 @@ class MeshyClient:
         with open(f"../../output/untextured_model_{id}.glb", "wb") as model_file:
             model_file.write(response.content)
     
-    def download_textured_model(self, textured_model_url: str, id: str) :
+    def download_textured_model(self, textured_model_url: str, id: str) -> str | None:
         response = requests.get(textured_model_url)
         response.raise_for_status()
-        with open(f"../../output/textured_model_{id}.glb", "wb") as textured_model_file:
+        output_dir = os.path.join(os.path.dirname(__file__), "..", "..", "output")
+        os.makedirs(output_dir, exist_ok=True)
+        model_path = os.path.join(output_dir, f"textured_model_{id}.glb")
+        with open(model_path, "wb") as textured_model_file:
             textured_model_file.write(response.content)
-        
-        return True
+        return model_path
+
+    def upload_model_to_supabase(self, model_path: str, id: str) -> str:
+       with open(model_path, "rb") as model_file:
+            self.supabase.storage.from_("textured_glbs").upload(f"{id}.glb", model_file)
+            return self.supabase.storage.from_("textured_glbs").get_public_url(f"{id}.glb")
             
     def list_tasks_image_to_3d(self, page_size: int = 10) -> list:
         response = requests.get(
@@ -162,34 +172,49 @@ class MeshyClient:
             print(task["id"])
             print(task["status"])
     
-    def process_image_to_3d(self, image_path: str) -> str:
+    def _resolve_image_path(self, image_input: str) -> str:
+        """If image_input is a URL, download to temp file and return path. Otherwise return as-is."""
+        if image_input.startswith(("http://", "https://")):
+            response = requests.get(image_input)
+            response.raise_for_status()
+            output_dir = os.path.join(os.path.dirname(__file__), "..", "..", "output")
+            os.makedirs(output_dir, exist_ok=True)
+            ext = ".png" if "png" in response.headers.get("content-type", "") else ".jpg"
+            temp_path = os.path.join(output_dir, f"input_image_{os.urandom(8).hex()}{ext}")
+            with open(temp_path, "wb") as f:
+                f.write(response.content)
+            return temp_path
+        return image_input
+
+    def process_image_to_3d(self, image_input: str) -> str | None:
+        """image_input can be a local file path or a CDN/HTTP URL."""
+        image_path = self._resolve_image_path(image_input)
         task_id_image_to_3d = self.convert_image_to_mesh(image_path)["result"]
         result = self.stream_image_to_3d_progress(task_id_image_to_3d)
         
-        if result == "SUCCEEDED":
-            print("Image to 3D conversion successful")
-        else:
+        if result != "SUCCEEDED":
             print("Image to 3D conversion failed")
-            return False
+            return None
+        print("Image to 3D conversion successful")
         
         task_id_retexture = self.retexture_mesh(task_id_image_to_3d, image_path)["result"]
         result = self.stream_retexture_progress(task_id_retexture)
         textured_model_url = self.retrieve_texture_json(task_id_retexture)["model_urls"]["glb"]
         
-        if result == "SUCCEEDED":
-            print("Retexturing successful")
-        else:
+        if result != "SUCCEEDED":
             print("Retexturing failed")
-            return False
+            return None
+        print("Retexturing successful")
         
-        final_model = self.download_textured_model(textured_model_url, task_id_image_to_3d)
+        model_path = self.download_textured_model(textured_model_url, task_id_image_to_3d)
         
-        if final_model:
+        if model_path:
             print("Final model downloaded successfully")
-            return True
+            cdn_url = self.upload_model_to_supabase(model_path, task_id_image_to_3d)
+            return cdn_url
         else:
             print("Failed to download final model")
-            return False
+            return None
     
 
 
