@@ -98,8 +98,8 @@ export default function ModelViewer() {
         const width = containerRef.current.clientWidth;
         const height = containerRef.current.clientHeight;
         const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 2000);
-        camera.position.set(0, 10, 0);
-        camera.lookAt(0, 0, 0);
+        camera.position.set(7, 8, 7);
+        camera.lookAt(0, 1, 0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(width, height);

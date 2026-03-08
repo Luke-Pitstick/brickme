@@ -103,8 +103,8 @@ function ModelViewer({ dataUrl }) {
     scene.background = new THREE.Color(0xece6da);
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 10, 0);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(7, 8, 7);
+    camera.lookAt(0, 1, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(width, height);
