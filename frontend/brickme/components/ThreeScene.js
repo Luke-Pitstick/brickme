@@ -17,7 +17,7 @@ function SpinningCube() {
 export default function ThreeScene() {
   return (
     <Canvas
-      style={{ height: "100vh", background: "#202020" }}
+      style={{ height: "100vh", background: "#c4c4c4" }}
       camera={{ position: [3, 3, 3], fov: 60 }}
     >
 
