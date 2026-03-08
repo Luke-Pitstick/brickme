@@ -5,7 +5,7 @@ import "@/app/global.css";
 const Layout = ({ children }) => {
   return (
     <html lang="en">
-      <body>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <Navbar />
           <main>{children}</main>

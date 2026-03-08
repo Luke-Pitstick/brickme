@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { uploadImage, startImageTo3D, pollUntilComplete, saveBuild } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -13,6 +14,7 @@ const STEPS = {
 };
 
 const Home = () => {
+  const router = useRouter();
   const { user } = useAuth();
   const [imageSrc, setImageSrc] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -66,6 +68,11 @@ const Home = () => {
         setResultUrl(result.result);
         setStatusMsg("Conversion complete!");
 
+        // Store model URL for viewer
+        if (typeof window !== "undefined") {
+          localStorage.setItem("modelUrl", result.result);
+        }
+
         // Auto-save if logged in
         if (user) {
           try {
@@ -79,6 +86,11 @@ const Home = () => {
             // Don't block the flow if save fails
           }
         }
+
+        // Redirect to 3D viewer after a short delay
+        setTimeout(() => {
+          router.push("/Test");
+        }, 1500);
       } else {
         setStep(STEPS.ERROR);
         setError(result.error || "Conversion failed");
@@ -101,16 +113,35 @@ const Home = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 gap-6">
+      <h1 className="text-3xl font-bold text-gray-800 mb-4">Convert to LEGO</h1>
+
       {/* Upload / preview area */}
-      <div
-        onClick={handleAreaClick}
-        className="w-80 h-80 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer hover:border-[#9B6DC6] hover:bg-gray-50 transition-colors"
-      >
-        {imageSrc ? (
-          <img src={imageSrc} alt="Preview" className="max-w-full max-h-full rounded-lg" />
-        ) : (
-          <span className="text-gray-400 text-sm">Click to upload an image</span>
-        )}
+      <div className="flex flex-col items-center gap-4">
+        <div
+          onClick={handleAreaClick}
+          className="w-80 h-80 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer hover:border-[#9B6DC6] hover:bg-gray-50 transition-colors relative"
+        >
+          {imageSrc ? (
+            <img src={imageSrc} alt="Preview" className="max-w-full max-h-full rounded-lg" />
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-gray-400 text-sm">Click to upload an image</span>
+            </div>
+          )}
+        </div>
+
+        {/* Upload button - always visible */}
+        <button
+          onClick={handleAreaClick}
+          disabled={isProcessing}
+          className={`px-6 py-3 font-bold rounded-lg transition-colors ${
+            isProcessing
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-[#9B6DC6] text-white hover:bg-[#8558B0]"
+          }`}
+        >
+          {imageSrc ? "Change Image" : "Upload Picture"}
+        </button>
       </div>
 
       <input
