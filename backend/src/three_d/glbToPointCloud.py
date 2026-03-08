@@ -25,7 +25,7 @@ def _sample_mesh_with_colors(mesh: trimesh.Trimesh, count: int):
     return np.asarray(points), np.asarray(colors) if colors is not None else None
 
 
-def glb_to_point_cloud(glb_path: str, number_of_points: int = 10000) -> o3d.geometry.PointCloud:
+def glb_to_point_cloud(glb_path: str, number_of_points: int = 1000000) -> o3d.geometry.PointCloud:
     """Convert GLB to point cloud, sampling colors from the model's texture."""
     loaded = trimesh.load(glb_path, force="mesh", process=False)
 
