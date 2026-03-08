@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
-import "@/app/globals.css";
+import "@/app/global.css";
 
 const Layout = ({ children }) => {
   return (
